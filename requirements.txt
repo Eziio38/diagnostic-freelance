@@ -1,0 +1,7 @@
+# Core dependency — local Whisper transcription (no API key required)
+faster-whisper>=1.0.0
+
+# Optional — speaker diarization (--diarize flag)
+# Uncomment and run: pip install pyannote.audio torch
+# pyannote.audio>=3.1.0
+# torch>=2.0.0
