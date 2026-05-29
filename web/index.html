@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <title>MeetTranscriber</title>
+  <meta name="description" content="Transcription de réunions Google Meet en texte via OpenAI Whisper." />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Transcriber" />
+  <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>MeetTranscriber</h1>
+  </header>
+
+  <main>
+    <!-- Accueil -->
+    <section id="tab-home" class="tab active">
+      <div class="actions">
+        <div id="rec-indicator" class="rec-indicator hidden">
+          <span class="rec-dot"></span> Enregistrement en cours…
+        </div>
+        <button id="btn-record" class="btn btn-primary big">
+          <span class="ico">🎙️</span> Enregistrer
+        </button>
+        <hr />
+        <button id="btn-import" class="btn">
+          <span class="ico">📄</span> Importer un fichier
+        </button>
+        <button id="btn-url" class="btn">
+          <span class="ico">🔗</span> Transcription via URL
+        </button>
+        <input id="file-input" type="file" accept="audio/*,video/mp4,.mp3,.m4a,.wav,.mp4" hidden />
+      </div>
+      <p class="hint">
+        Formats : mp4 · m4a · mp3 · wav — taille max 25 Mo.
+      </p>
+    </section>
+
+    <!-- Historique -->
+    <section id="tab-history" class="tab">
+      <div id="history-list" class="history-list"></div>
+      <div id="history-empty" class="empty">
+        <div class="empty-ico">🌊</div>
+        <p>Aucune transcription</p>
+        <small>Vos transcriptions apparaîtront ici.</small>
+      </div>
+    </section>
+
+    <!-- Réglages -->
+    <section id="tab-settings" class="tab">
+      <h2>Clé API OpenAI</h2>
+      <div class="field">
+        <input id="api-key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      </div>
+      <div class="row">
+        <button id="btn-save-key" class="btn btn-primary">Enregistrer la clé</button>
+        <button id="btn-delete-key" class="btn btn-danger">Supprimer</button>
+      </div>
+      <p class="hint">
+        La clé est stockée uniquement sur cet appareil et envoyée directement à OpenAI.
+        Utilisez une clé avec un plafond de dépense.
+        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Obtenir une clé →</a>
+      </p>
+
+      <h2>Langue de transcription</h2>
+      <div class="field">
+        <select id="lang-select">
+          <option value="auto">Automatique (détection)</option>
+          <option value="fr">Français</option>
+          <option value="en">Anglais</option>
+          <option value="es">Espagnol</option>
+          <option value="de">Allemand</option>
+          <option value="it">Italien</option>
+          <option value="pt">Portugais</option>
+          <option value="nl">Néerlandais</option>
+          <option value="zh">Chinois</option>
+          <option value="ja">Japonais</option>
+          <option value="ar">Arabe</option>
+        </select>
+      </div>
+
+      <h2>À propos</h2>
+      <ul class="about">
+        <li><span>Modèle</span><span>whisper-1 (OpenAI)</span></li>
+        <li><span>Taille max</span><span>25 Mo</span></li>
+        <li><span>Version</span><span>1.0</span></li>
+      </ul>
+    </section>
+
+    <!-- Vue transcription (overlay) -->
+    <section id="view-transcript" class="overlay hidden">
+      <div class="overlay-header">
+        <button id="btn-close-transcript" class="btn-icon" aria-label="Fermer">✕</button>
+        <h2 id="transcript-title">Transcription</h2>
+        <div class="overlay-actions">
+          <button id="btn-copy" class="btn-icon" aria-label="Copier">📋</button>
+          <button id="btn-share" class="btn-icon" aria-label="Partager">📤</button>
+        </div>
+      </div>
+      <div id="transcript-body" class="transcript-body"></div>
+    </section>
+  </main>
+
+  <!-- URL sheet -->
+  <div id="url-sheet" class="sheet hidden">
+    <div class="sheet-card">
+      <h2>Transcription par URL</h2>
+      <input id="url-input" type="url" inputmode="url" placeholder="https://…" autocapitalize="off" spellcheck="false" />
+      <p class="hint">
+        Lien direct vers un fichier audio/vidéo (Dropbox, export Google Drive…).
+        YouTube et les liens protégés ne fonctionnent pas.
+      </p>
+      <div class="row">
+        <button id="btn-url-cancel" class="btn">Annuler</button>
+        <button id="btn-url-go" class="btn btn-primary">Transcrire</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Busy / toast / error -->
+  <div id="busy" class="busy hidden">
+    <div class="spinner"></div>
+    <p>Transcription en cours…</p>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+
+  <nav class="tabbar">
+    <button class="tabbtn active" data-tab="home"><span>🏠</span>Accueil</button>
+    <button class="tabbtn" data-tab="history"><span>🕑</span>Historique</button>
+    <button class="tabbtn" data-tab="settings"><span>⚙️</span>Réglages</button>
+  </nav>
+
+  <script src="./app.js"></script>
+</body>
+</html>
