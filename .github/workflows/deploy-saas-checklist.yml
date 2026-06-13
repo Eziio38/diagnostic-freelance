@@ -1,0 +1,27 @@
+name: Deploy SaaS Daily to GitHub Pages
+
+on:
+  push:
+    branches: ["claude/daily-saas-checklist-app-mxeuqn"]
+    paths:
+      - "saas-checklist/**"
+      - ".github/workflows/deploy-saas-checklist.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy saas-checklist/ to gh-pages (sous-dossier /saas-checklist)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./saas-checklist
+          destination_dir: saas-checklist
+          keep_files: true
