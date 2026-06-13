@@ -52,6 +52,26 @@ html, body {
 }
 .flame { font-size: 16px; }
 
+/* ---------- Phase bar ---------- */
+.phasebar {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.phase-row { display: flex; align-items: center; gap: 10px; }
+.phase-row label { font-size: 13px; color: var(--muted); font-weight: 600; }
+#phaseSelect {
+  flex: 1;
+  background: var(--bg-soft); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 10px; font-size: 14px; font-weight: 600;
+}
+#phaseSelect:focus { outline: none; border-color: var(--accent); }
+.phase-goal { margin: 10px 0 0; font-size: 13.5px; line-height: 1.4; }
+.phase-done { margin: 6px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+
 /* ---------- Date bar ---------- */
 .datebar {
   display: flex; align-items: center; justify-content: space-between;
@@ -97,6 +117,12 @@ html, body {
 .cat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .cat-emoji { font-size: 18px; }
 .cat-head h2 { margin: 0; font-size: 15px; color: var(--cat, var(--text)); letter-spacing: -0.01em; }
+
+.cat.horizon {
+  background: linear-gradient(180deg, rgba(234, 179, 8, 0.10), var(--card));
+  border-style: dashed;
+}
+.cat.horizon .cat-head h2 { font-size: 13.5px; }
 
 .items { display: flex; flex-direction: column; }
 .item {

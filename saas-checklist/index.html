@@ -19,13 +19,22 @@
         <span class="logo">✓</span>
         <div>
           <h1>SaaS Daily</h1>
-          <p class="tagline">Ta feuille de route, un jour à la fois</p>
+          <p class="tagline">Construire Sidian, un jour à la fois</p>
         </div>
       </div>
       <div class="streak" id="streak" title="Jours d'affilée avec au moins une tâche faite">
         <span class="flame">🔥</span><span id="streakCount">0</span>
       </div>
     </header>
+
+    <section class="phasebar">
+      <div class="phase-row">
+        <label for="phaseSelect">Mon palier&nbsp;:</label>
+        <select id="phaseSelect" aria-label="Palier de croissance"></select>
+      </div>
+      <p class="phase-goal" id="phaseGoal">—</p>
+      <p class="phase-done" id="phaseDone">—</p>
+    </section>
 
     <section class="datebar">
       <button class="nav" id="prevDay" aria-label="Jour précédent">‹</button>
