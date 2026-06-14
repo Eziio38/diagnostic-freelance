@@ -1,9 +1,7 @@
-/* SaaS Daily (Sidian) — check-list quotidienne.
-   Le palier de croissance s'adapte AUTOMATIQUEMENT aux tâches réalisées :
-   chaque tâche est rattachée à son palier le plus précoce (les tâches de
-   routine récurrentes sont exclues du calcul) ; quand ~70 % des tâches propres
-   à un palier ont été cochées (sur l'ensemble de l'historique), on passe au
-   palier suivant. La progression ne redescend jamais. */
+/* SaaS Daily (Sidian) — juste les tâches du jour.
+   Le palier de croissance est déterminé AUTOMATIQUEMENT par les tâches déjà
+   réalisées (voir tasks.js). On affiche une courte liste tenant sur un écran,
+   sans indicateur de progression ni ajout manuel — uniquement quoi faire. */
 
 (() => {
   "use strict";
@@ -13,9 +11,12 @@
   const PHASES = window.PHASES;
   const MIN_PHASE = PHASES[0].id;
   const MAX_PHASE = PHASES[PHASES.length - 1].id;
-  const ADVANCE_RATIO = 0.7; // part des tâches propres au palier à réaliser pour avancer
+  const ADVANCE_RATIO = 0.7;        // part des tâches propres au palier pour avancer
+  const DAILY_COUNT = 5;            // nombre de tâches affichées par jour (tient sans scroll)
+  // Ordre de priorité d'affichage des catégories (1 tâche par catégorie / jour).
+  const PRIORITY = ["cursor", "tests", "produit", "marketing", "croissance", "strategie", "routine"];
 
-  // ---------- Utilitaires date ----------
+  // ---------- Date ----------
   const fmtKey = (d) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -23,12 +24,10 @@
     return `${y}-${m}-${day}`;
   };
   const dayNumber = (d) =>
-    Math.floor(
-      new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000
-    );
+    Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000);
   const todayKey = () => fmtKey(new Date());
 
-  // ---------- Hash + PRNG déterministe ----------
+  // ---------- Hash + PRNG ----------
   function hashStr(str) {
     let h = 2166136261 >>> 0;
     for (let i = 0; i < str.length; i++) {
@@ -57,28 +56,20 @@
     return idx;
   }
 
-  // ---------- Tâches propres à chaque palier (pour la progression auto) ----------
-  // Une tâche présente dans 5 paliers ou plus est « transversale » (routine,
-  // focus, stratégie permanente) → exclue du calcul d'avancement.
+  // ---------- Palier automatique ----------
   const isCrossCutting = (task) => task.p.length >= 5;
   const primaryByPhase = {};
   PHASES.forEach((p) => (primaryByPhase[p.id] = []));
   CATS.forEach((cat) => {
     cat.tasks.forEach((task, i) => {
       if (isCrossCutting(task)) return;
-      const primary = Math.min.apply(null, task.p);
-      primaryByPhase[primary].push(`${cat.id}#${i}`);
+      primaryByPhase[Math.min.apply(null, task.p)].push(`${cat.id}#${i}`);
     });
   });
-
-  function phaseCompletion(phase, everDone) {
-    const list = primaryByPhase[phase] || [];
-    if (!list.length) return { done: 0, total: 0, ratio: 1 };
-    const done = list.filter((k) => everDone[k]).length;
-    return { done, total: list.length, ratio: done / list.length };
-  }
   function phaseValidated(phase, everDone) {
-    return phaseCompletion(phase, everDone).ratio >= ADVANCE_RATIO;
+    const list = primaryByPhase[phase] || [];
+    if (!list.length) return true;
+    return list.filter((k) => everDone[k]).length / list.length >= ADVANCE_RATIO;
   }
   function currentPhase(everDone) {
     for (let p = MIN_PHASE; p < MAX_PHASE; p++) {
@@ -87,43 +78,24 @@
     return MAX_PHASE;
   }
 
-  // ---------- Génération du jour selon le palier ----------
+  // ---------- Sélection du jour (liste courte et plate) ----------
   function generateForDate(d, phase) {
     const dn = dayNumber(d);
     const out = [];
-    for (const cat of CATS) {
+    for (const id of PRIORITY) {
+      if (out.length >= DAILY_COUNT) break;
+      const cat = CATS.find((c) => c.id === id);
       const eligible = [];
       cat.tasks.forEach((task, i) => {
         if (task.p.includes(phase)) eligible.push(i);
       });
       if (!eligible.length) continue;
       const order = seededOrder(eligible.length, hashStr(cat.id + "@" + phase));
-      const count = Math.min(cat.perDay, eligible.length);
-      const start = ((dn * count) % eligible.length + eligible.length) % eligible.length;
-      const picks = [];
-      for (let k = 0; k < count; k++) {
-        const taskIndex = eligible[order[(start + k) % eligible.length]];
-        picks.push({ key: `${cat.id}#${taskIndex}`, text: cat.tasks[taskIndex].t });
-      }
-      out.push({ cat, picks });
+      const start = ((dn % eligible.length) + eligible.length) % eligible.length;
+      const idx = eligible[order[start]];
+      out.push({ cat, key: `${cat.id}#${idx}`, text: cat.tasks[idx].t });
     }
     return out;
-  }
-
-  function horizonForDate(d, phase) {
-    const next = phase + 1;
-    if (next > MAX_PHASE) return null;
-    const candidates = [];
-    for (const cat of CATS) {
-      cat.tasks.forEach((task, i) => {
-        if (task.p.includes(next) && !task.p.includes(phase)) {
-          candidates.push({ cat, key: `${cat.id}#${i}`, text: task.t });
-        }
-      });
-    }
-    if (!candidates.length) return null;
-    const pick = candidates[dayNumber(d) % candidates.length];
-    return { ...pick, nextPhase: PHASES.find((p) => p.id === next) };
   }
 
   // ---------- Persistance ----------
@@ -140,222 +112,89 @@
   let store = loadStore();
   if (!store.days) store.days = {};
   if (!store.everDone) store.everDone = {};
-  // Reconstituer l'historique des tâches cochées (au cas où) pour la progression.
   for (const key in store.days) {
     const done = store.days[key].done || {};
     for (const k in done) if (done[k]) store.everDone[k] = true;
   }
 
   function dayState(key) {
-    if (!store.days[key]) store.days[key] = { done: {}, custom: [] };
+    if (!store.days[key]) store.days[key] = { done: {} };
     if (!store.days[key].done) store.days[key].done = {};
-    if (!store.days[key].custom) store.days[key].custom = [];
     return store.days[key];
-  }
-
-  function dayHasProgress(key) {
-    const ds = store.days[key];
-    if (!ds) return false;
-    if (Object.values(ds.done || {}).some(Boolean)) return true;
-    if ((ds.custom || []).some((c) => c.done)) return true;
-    return false;
-  }
-
-  function computeStreak() {
-    let streak = 0;
-    const d = new Date();
-    if (!dayHasProgress(fmtKey(d))) d.setDate(d.getDate() - 1);
-    for (;;) {
-      if (dayHasProgress(fmtKey(d))) {
-        streak++;
-        d.setDate(d.getDate() - 1);
-      } else break;
-    }
-    return streak;
   }
 
   // ---------- État de vue ----------
   let viewDate = new Date();
-
-  // ---------- Rendu ----------
   const el = (id) => document.getElementById(id);
   const listEl = el("list");
 
   function frenchDate(d) {
-    const opts = { weekday: "long", day: "numeric", month: "long" };
-    const s = d.toLocaleDateString("fr-FR", opts);
+    const s = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
     return s.charAt(0).toUpperCase() + s.slice(1);
-  }
-
-  function isChecked(ds, item) {
-    return item.custom
-      ? !!ds.custom.find((c) => c.id === item.key)?.done
-      : !!ds.done[item.key];
-  }
-
-  function makeRow(key, ds, item, accent) {
-    const checked = isChecked(ds, item);
-    const row = document.createElement("label");
-    row.className = "item" + (checked ? " checked" : "");
-    if (accent) row.style.setProperty("--cat", accent);
-
-    const box = document.createElement("input");
-    box.type = "checkbox";
-    box.checked = checked;
-    box.addEventListener("change", () => toggle(key, item, box.checked));
-
-    const txt = document.createElement("span");
-    txt.className = "item-text";
-    txt.textContent = item.text;
-
-    row.appendChild(box);
-    row.appendChild(txt);
-
-    if (item.custom) {
-      const del = document.createElement("button");
-      del.className = "del";
-      del.type = "button";
-      del.setAttribute("aria-label", "Supprimer");
-      del.textContent = "✕";
-      del.addEventListener("click", (e) => {
-        e.preventDefault();
-        removeCustom(key, item.key);
-      });
-      row.appendChild(del);
-    }
-    return row;
   }
 
   function render() {
     const key = fmtKey(viewDate);
     const ds = dayState(key);
     const phase = currentPhase(store.everDone);
-    const groups = generateForDate(viewDate, phase);
-    const horizon = horizonForDate(viewDate, phase);
+    const items = generateForDate(viewDate, phase);
 
-    // En-tête date
     el("dateLabel").textContent =
-      key === todayKey() ? frenchDate(viewDate) + " · aujourd'hui" : frenchDate(viewDate);
+      key === todayKey() ? frenchDate(viewDate) : frenchDate(viewDate);
     el("nextDay").disabled = key >= todayKey();
-
-    // Palier (automatique, lecture seule)
-    const ph = PHASES.find((p) => p.id === phase);
-    const comp = phaseCompletion(phase, store.everDone);
-    const pphase = comp.total ? Math.round(comp.ratio * 100) : 100;
-    el("phaseIcon").textContent = ph.emoji;
-    el("phaseBadge").textContent = `Palier ${ph.id} · ${ph.name}`;
-    el("phasePct").textContent = comp.total ? `${pphase}%` : "✓";
-    el("phaseMiniFill").style.width = (comp.total ? Math.min(100, pphase) : 100) + "%";
-    el("phaseGoal").textContent = ph.goal;
-    const nextPh = PHASES.find((p) => p.id === phase + 1);
-    el("phaseNext").textContent = nextPh
-      ? `Prochain palier : ${nextPh.emoji} ${nextPh.name}`
-      : "Dernier palier — objectif 2 000€/mois 🎯";
 
     listEl.innerHTML = "";
     let total = 0;
     let done = 0;
 
-    for (const { cat, picks } of groups) {
-      const section = document.createElement("section");
-      section.className = "cat";
-      section.style.setProperty("--cat", cat.color);
-
-      const head = document.createElement("div");
-      head.className = "cat-head";
-      head.innerHTML = `<span class="cat-dot"></span><span class="cat-emoji">${cat.emoji}</span><h2>${cat.name}</h2>`;
-      section.appendChild(head);
-
-      const items = document.createElement("div");
-      items.className = "items";
-
-      const customForCat = ds.custom.filter((c) => c.catId === cat.id);
-      const all = [
-        ...picks.map((p) => ({ ...p, custom: false })),
-        ...customForCat.map((c) => ({ key: c.id, text: c.text, custom: true })),
-      ];
-
-      for (const item of all) {
-        total++;
-        if (isChecked(ds, item)) done++;
-        items.appendChild(makeRow(key, ds, item, null));
-      }
-
-      section.appendChild(items);
-      listEl.appendChild(section);
-    }
-
-    // Carte « cap suivant »
-    if (horizon) {
+    for (const item of items) {
       total++;
-      if (isChecked(ds, horizon)) done++;
-      const section = document.createElement("section");
-      section.className = "cat horizon";
-      section.style.setProperty("--cat", "#c79a1e");
-      const head = document.createElement("div");
-      head.className = "cat-head";
-      head.innerHTML =
-        `<span class="cat-emoji">🔭</span><h2>Cap suivant — préparer « ${horizon.nextPhase.emoji} ${horizon.nextPhase.name} »</h2>`;
-      section.appendChild(head);
-      const items = document.createElement("div");
-      items.className = "items";
-      items.appendChild(makeRow(key, ds, { ...horizon, custom: false }, "#c79a1e"));
-      section.appendChild(items);
-      listEl.appendChild(section);
+      const checked = !!ds.done[item.key];
+      if (checked) done++;
+
+      const row = document.createElement("label");
+      row.className = "item" + (checked ? " checked" : "");
+
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = checked;
+      box.addEventListener("change", () => toggle(key, item.key, box.checked));
+
+      const emoji = document.createElement("span");
+      emoji.className = "item-emoji";
+      emoji.textContent = item.cat.emoji;
+
+      const txt = document.createElement("span");
+      txt.className = "item-text";
+      txt.textContent = item.text;
+
+      row.appendChild(box);
+      row.appendChild(emoji);
+      row.appendChild(txt);
+      listEl.appendChild(row);
     }
 
-    const pct = total ? Math.round((done / total) * 100) : 0;
-    el("progressFill").style.width = pct + "%";
-    el("progressText").textContent = `${done} / ${total}`;
-    el("streakCount").textContent = computeStreak();
-
-    if (total && done === total) celebrate();
+    if (total && done === total) celebrate(key);
   }
 
-  function toggle(key, item, checked) {
+  function toggle(key, taskKey, checked) {
     const ds = dayState(key);
-    if (item.custom) {
-      const c = ds.custom.find((x) => x.id === item.key);
-      if (c) c.done = checked;
+    if (checked) {
+      ds.done[taskKey] = true;
+      store.everDone[taskKey] = true; // fait avancer le palier (monotone)
     } else {
-      if (checked) {
-        ds.done[item.key] = true;
-        store.everDone[item.key] = true; // progression du palier (monotone)
-      } else {
-        delete ds.done[item.key];
-      }
+      delete ds.done[taskKey];
     }
     saveStore(store);
     render();
   }
 
-  function removeCustom(key, id) {
-    const ds = dayState(key);
-    ds.custom = ds.custom.filter((c) => c.id !== id);
-    saveStore(store);
-    render();
-  }
-
-  function addCustom(catId, text) {
-    const key = fmtKey(viewDate);
-    const ds = dayState(key);
-    ds.custom.push({
-      id: "custom#" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      catId,
-      text,
-      done: false,
-    });
-    saveStore(store);
-    render();
-  }
-
-  // ---------- Feedback ----------
+  // ---------- Petit feedback de fin de journée ----------
   let lastCelebrated = "";
-  function celebrate() {
-    const key = fmtKey(viewDate);
+  function celebrate(key) {
     if (lastCelebrated === key) return;
     lastCelebrated = key;
-    showToast("🎉 Journée complétée — bravo, continue la série !");
+    showToast("🎉 Tout est fait pour aujourd'hui — bravo !");
   }
   let toastTimer;
   function showToast(msg) {
@@ -384,24 +223,6 @@
     viewDate = new Date();
     lastCelebrated = "";
     render();
-  });
-
-  // Sélecteur de catégorie pour les tâches perso
-  const catSelect = el("customCat");
-  for (const cat of CATS) {
-    const opt = document.createElement("option");
-    opt.value = cat.id;
-    opt.textContent = `${cat.emoji} ${cat.name}`;
-    catSelect.appendChild(opt);
-  }
-  el("customForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const input = el("customInput");
-    const text = input.value.trim();
-    if (!text) return;
-    addCustom(catSelect.value, text);
-    input.value = "";
-    input.blur();
   });
 
   // ---------- Installation PWA ----------
