@@ -61,11 +61,11 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
 .nav:hover { background: var(--hover); }
 .nav:disabled { opacity: 0.25; cursor: default; background: transparent; }
 
-/* ---------- To-do list (style Notion, compact) ---------- */
-.list { display: flex; flex-direction: column; gap: 1px; }
+/* ---------- To-do list (style Notion) ---------- */
+.list { display: flex; flex-direction: column; gap: 6px; }
 .item {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 9px 8px; border-radius: 5px; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 13px 8px; border-radius: 6px; cursor: pointer;
   transition: background 0.08s;
 }
 .item:hover { background: var(--hover); }

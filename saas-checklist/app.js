@@ -152,8 +152,18 @@
     const phase = currentPhase(store.everDone);
     const items = generateForDate(viewDate, phase);
 
-    el("dateLabel").textContent =
-      key === todayKey() ? frenchDate(viewDate) : frenchDate(viewDate);
+    // Titre relatif au jour affiché + date complète en sous-titre.
+    const diff = dayNumber(viewDate) - dayNumber(new Date());
+    let title;
+    if (diff === 0) title = "Aujourd'hui";
+    else if (diff === -1) title = "Hier";
+    else if (diff === 1) title = "Demain";
+    else {
+      const wd = viewDate.toLocaleDateString("fr-FR", { weekday: "long" });
+      title = wd.charAt(0).toUpperCase() + wd.slice(1);
+    }
+    el("title").textContent = title;
+    el("dateLabel").textContent = frenchDate(viewDate);
     el("nextDay").disabled = key >= todayKey();
 
     listEl.innerHTML = "";
