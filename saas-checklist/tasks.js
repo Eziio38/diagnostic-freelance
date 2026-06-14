@@ -50,6 +50,44 @@ window.PHASES = [
 
 const ALL = [0, 1, 2, 3, 4, 5];
 
+/* Jalons concrets = vraie source de vérité de « où j'en suis ».
+   L'utilisateur coche ce qui est fait ; l'app en déduit l'étape courante
+   (1ère étape dont tous les jalons ne sont pas encore cochés). */
+window.MILESTONES = [
+  // Étape 0 — Fondations
+  { phase: 0, id: "m0a", t: "Projet de l'app créé et mis en ligne (Vercel)." },
+  { phase: 0, id: "m0b", t: "Comptes des outils créés (base de données, paiements, emails, tâches auto)." },
+  { phase: 0, id: "m0c", t: "Base de données créée (tables principales)." },
+  { phase: 0, id: "m0d", t: "Sécurité de base : chaque freelance ne voit que ses propres données." },
+  // Étape 1 — Construction (1ère version)
+  { phase: 1, id: "m1a", t: "Inscription/connexion du freelance + compte Stripe connecté." },
+  { phase: 1, id: "m1b", t: "Création de contrat (formulaire) qui fonctionne." },
+  { phase: 1, id: "m1c", t: "Échéances générées automatiquement à partir du contrat." },
+  { phase: 1, id: "m1d", t: "Page d'enregistrement de la carte client (avec texte d'autorisation)." },
+  { phase: 1, id: "m1e", t: "Emails de rappel automatiques en cas de retard (J+2 / J+5 / J+9)." },
+  { phase: 1, id: "m1f", t: "Prélèvement automatique à J+10 (avec la commission)." },
+  { phase: 1, id: "m1g", t: "Tableau de bord du freelance (contrats, cartes, paiements)." },
+  // Étape 2 — Fiabilisation
+  { phase: 2, id: "m2a", t: "Tests automatiques en place (paiement, rappels, échéances)." },
+  { phase: 2, id: "m2b", t: "Anti-double-paiement vérifié." },
+  { phase: 2, id: "m2c", t: "Relecture de sécurité passée." },
+  { phase: 2, id: "m2d", t: "Check-list « avant mise en ligne » validée." },
+  // Étape 3 — Bêta (premiers testeurs)
+  { phase: 3, id: "m3a", t: "Au moins 5 freelances testeurs recrutés." },
+  { phase: 3, id: "m3b", t: "Parcours complet testé en vrai (contrat → carte → prélèvement)." },
+  { phase: 3, id: "m3c", t: "Moyen de recueillir les avis en place." },
+  { phase: 3, id: "m3d", t: "Principales difficultés des testeurs corrigées." },
+  // Étape 4 — Lancement
+  { phase: 4, id: "m4a", t: "Page de présentation (landing) en ligne." },
+  { phase: 4, id: "m4b", t: "Premiers clients payants." },
+  { phase: 4, id: "m4c", t: "1er prélèvement automatique réussi en vrai." },
+  { phase: 4, id: "m4d", t: "Suivi des chiffres clés en place." },
+  // Étape 5 — Croissance
+  { phase: 5, id: "m5a", t: "Tunnel d'inscription analysé et amélioré." },
+  { phase: 5, id: "m5b", t: "Un canal pour trouver des clients qui fonctionne." },
+  { phase: 5, id: "m5c", t: "Progression mesurée vers 2 000€/mois." },
+];
+
 window.CATEGORIES = [
   {
     id: "cursor",

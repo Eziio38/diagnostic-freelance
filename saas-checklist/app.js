@@ -1,7 +1,7 @@
-/* SaaS Daily (Sidian) — juste les tâches du jour.
-   Le palier de croissance est déterminé AUTOMATIQUEMENT par les tâches déjà
-   réalisées (voir tasks.js). On affiche une courte liste tenant sur un écran,
-   sans indicateur de progression ni ajout manuel — uniquement quoi faire. */
+/* SaaS Daily (Sidian) — check-list quotidienne.
+   « Où j'en suis » est suivi via des JALONS concrets que tu coches au fur et à
+   mesure (écran Mon avancement, bouton ⚙︎). L'app en déduit l'étape courante
+   et te propose chaque jour une courte liste de tâches adaptées. */
 
 (() => {
   "use strict";
@@ -9,12 +9,14 @@
   const STORE_KEY = "saasDaily:v3";
   const CATS = window.CATEGORIES;
   const PHASES = window.PHASES;
+  const MILESTONES = window.MILESTONES;
   const MIN_PHASE = PHASES[0].id;
   const MAX_PHASE = PHASES[PHASES.length - 1].id;
-  const ADVANCE_RATIO = 0.7;        // part des tâches propres au palier pour avancer
-  const DAILY_COUNT = 8;            // nombre de tâches affichées par jour
-  // Ordre de priorité d'affichage des catégories (1 tâche par catégorie / jour).
+  const DAILY_COUNT = 8;
   const PRIORITY = ["cursor", "tests", "produit", "marketing", "croissance", "strategie", "routine"];
+
+  const msByPhase = {};
+  PHASES.forEach((p) => (msByPhase[p.id] = MILESTONES.filter((m) => m.phase === p.id)));
 
   // ---------- Date ----------
   const fmtKey = (d) => {
@@ -56,32 +58,38 @@
     return idx;
   }
 
-  // ---------- Palier automatique ----------
-  const isCrossCutting = (task) => task.p.length >= 5;
-  const primaryByPhase = {};
-  PHASES.forEach((p) => (primaryByPhase[p.id] = []));
-  CATS.forEach((cat) => {
-    cat.tasks.forEach((task, i) => {
-      if (isCrossCutting(task)) return;
-      primaryByPhase[Math.min.apply(null, task.p)].push(`${cat.id}#${i}`);
-    });
-  });
-  function phaseValidated(phase, everDone) {
-    const list = primaryByPhase[phase] || [];
-    if (!list.length) return true;
-    return list.filter((k) => everDone[k]).length / list.length >= ADVANCE_RATIO;
+  // ---------- Persistance ----------
+  function loadStore() {
+    try {
+      return JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+    } catch {
+      return {};
+    }
   }
-  function currentPhase(everDone) {
+  function saveStore() {
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  }
+  let store = loadStore();
+  if (!store.days) store.days = {};
+  if (!store.milestones) store.milestones = {};
+
+  // ---------- Étape courante = 1ère étape dont les jalons ne sont pas tous faits ----------
+  function phaseDone(p) {
+    const ms = msByPhase[p] || [];
+    if (!ms.length) return true;
+    return ms.every((m) => store.milestones[m.id]);
+  }
+  function currentPhase() {
     for (let p = MIN_PHASE; p < MAX_PHASE; p++) {
-      if (!phaseValidated(p, everDone)) return p;
+      if (!phaseDone(p)) return p;
     }
     return MAX_PHASE;
   }
+  const milestonesDoneCount = () => MILESTONES.filter((m) => store.milestones[m.id]).length;
 
-  // ---------- Sélection du jour (liste courte et plate) ----------
+  // ---------- Sélection du jour (liste courte, répartie entre catégories) ----------
   function generateForDate(d, phase) {
     const dn = dayNumber(d);
-    // Catégories éligibles au palier, chacune avec son ordre stable + point de départ.
     const cats = [];
     for (const id of PRIORITY) {
       const cat = CATS.find((c) => c.id === id);
@@ -94,7 +102,6 @@
       const start = ((dn % eligible.length) + eligible.length) % eligible.length;
       cats.push({ cat, eligible, order, start, taken: 0 });
     }
-    // Round-robin : on répartit entre catégories, sans répéter une tâche dans la journée.
     const out = [];
     let progress = true;
     while (out.length < DAILY_COUNT && progress) {
@@ -111,60 +118,25 @@
     return out;
   }
 
-  // ---------- Persistance ----------
-  function loadStore() {
-    try {
-      return JSON.parse(localStorage.getItem(STORE_KEY)) || { days: {}, everDone: {} };
-    } catch {
-      return { days: {}, everDone: {} };
-    }
-  }
-  function saveStore(s) {
-    localStorage.setItem(STORE_KEY, JSON.stringify(s));
-  }
-  let store = loadStore();
-  if (!store.days) store.days = {};
-  if (!store.everDone) store.everDone = {};
-  for (const key in store.days) {
-    const done = store.days[key].done || {};
-    for (const k in done) if (done[k]) store.everDone[k] = true;
-  }
-
   function dayState(key) {
     if (!store.days[key]) store.days[key] = { done: {} };
     if (!store.days[key].done) store.days[key].done = {};
     return store.days[key];
   }
 
-  // ---------- Démarrage : « où en es-tu ? » ----------
-  // Choisir une étape marque les étapes précédentes comme déjà faites, tout en
-  // conservant les vraies cases cochées dans l'historique.
-  function applyStage(n) {
-    const ed = {};
-    for (let p = MIN_PHASE; p < n; p++) {
-      (primaryByPhase[p] || []).forEach((k) => (ed[k] = true));
-    }
-    for (const key in store.days) {
-      const done = store.days[key].done || {};
-      for (const k in done) if (done[k]) ed[k] = true;
-    }
-    store.everDone = ed;
-    store.onboarded = true;
-    saveStore(store);
-  }
-
-  // ---------- État de vue ----------
-  let viewDate = new Date();
+  // ---------- DOM ----------
   const el = (id) => document.getElementById(id);
   const listEl = el("list");
+  const setupEl = el("setup");
+  let viewDate = new Date();
+  let lastCelebrated = "";
 
   function frenchDate(d) {
     const s = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
-  // ---------- Écran de démarrage ----------
-  const setupEl = el("setup");
+  // ---------- Écran « Mon avancement » (jalons) ----------
   function setupMode(on) {
     setupEl.hidden = !on;
     listEl.hidden = on;
@@ -173,45 +145,80 @@
       if (b.id !== "editStage") b.style.display = on ? "none" : "";
     });
   }
-  function showSetup() {
-    el("title").textContent = "Où en es-tu ?";
+
+  function showSetup(firstRun) {
+    el("title").textContent = firstRun ? "Où en es-tu ?" : "Mon avancement";
     setupEl.innerHTML = "";
 
     const intro = document.createElement("p");
     intro.className = "setup-intro";
     intro.textContent =
-      "Choisis ton étape actuelle. L'app marquera les étapes précédentes comme faites, te proposera les bonnes tâches, puis s'adaptera automatiquement.";
+      "Coche tout ce que tu as déjà fait. L'app saura précisément où tu en es et te proposera la suite. Reviens cocher un jalon dès qu'il est terminé.";
     setupEl.appendChild(intro);
 
     for (const ph of PHASES) {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "stage-card";
-      card.innerHTML =
-        `<span class="stage-emoji">${ph.emoji}</span>` +
-        `<span class="stage-info">` +
-        `<span class="stage-name">Étape ${ph.id} — ${ph.name}</span>` +
-        `<span class="stage-goal">${ph.goal}</span>` +
-        `</span>`;
-      card.addEventListener("click", () => {
-        applyStage(ph.id);
-        setupMode(false);
-        viewDate = new Date();
-        lastCelebrated = "";
-        render();
-      });
-      setupEl.appendChild(card);
+      const group = document.createElement("div");
+      group.className = "ms-group";
+
+      const head = document.createElement("div");
+      head.className = "ms-head";
+      const ms = msByPhase[ph.id] || [];
+      const doneN = ms.filter((m) => store.milestones[m.id]).length;
+      head.innerHTML =
+        `<span class="ms-emoji">${ph.emoji}</span>` +
+        `<span class="ms-name">Étape ${ph.id} — ${ph.name}</span>` +
+        `<span class="ms-count">${doneN}/${ms.length}</span>`;
+      group.appendChild(head);
+
+      for (const m of ms) {
+        const checked = !!store.milestones[m.id];
+        const row = document.createElement("label");
+        row.className = "ms-row" + (checked ? " checked" : "");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = checked;
+        box.addEventListener("change", () => {
+          if (box.checked) store.milestones[m.id] = true;
+          else delete store.milestones[m.id];
+          saveStore();
+          row.classList.toggle("checked", box.checked);
+          head.querySelector(".ms-count").textContent =
+            `${ms.filter((x) => store.milestones[x.id]).length}/${ms.length}`;
+        });
+        const txt = document.createElement("span");
+        txt.className = "ms-text";
+        txt.textContent = m.t;
+        row.appendChild(box);
+        row.appendChild(txt);
+        group.appendChild(row);
+      }
+      setupEl.appendChild(group);
     }
+
+    const cta = document.createElement("button");
+    cta.type = "button";
+    cta.className = "setup-cta";
+    cta.textContent = "Voir mes tâches du jour →";
+    cta.addEventListener("click", () => {
+      store.onboarded = true;
+      saveStore();
+      setupMode(false);
+      viewDate = new Date();
+      lastCelebrated = "";
+      render();
+    });
+    setupEl.appendChild(cta);
+
     setupMode(true);
   }
 
+  // ---------- Rendu de la liste du jour ----------
   function render() {
     const key = fmtKey(viewDate);
     const ds = dayState(key);
-    const phase = currentPhase(store.everDone);
+    const phase = currentPhase();
     const items = generateForDate(viewDate, phase);
 
-    // Titre relatif au jour affiché + date complète en sous-titre.
     const diff = dayNumber(viewDate) - dayNumber(new Date());
     let title;
     if (diff === 0) title = "Aujourd'hui";
@@ -253,8 +260,6 @@
       const chev = document.createElement("span");
       chev.className = "item-chev";
       chev.textContent = "⌄";
-
-      // Taper le texte (ou le chevron) déplie / replie le détail complet.
       const expand = (e) => {
         e.preventDefault();
         row.classList.toggle("expanded");
@@ -268,7 +273,6 @@
       row.appendChild(chev);
       listEl.appendChild(row);
 
-      // Afficher le chevron uniquement si le texte est réellement tronqué.
       if (txt.scrollHeight - txt.clientHeight > 1) row.classList.add("truncated");
     }
 
@@ -277,18 +281,13 @@
 
   function toggle(key, taskKey, checked) {
     const ds = dayState(key);
-    if (checked) {
-      ds.done[taskKey] = true;
-      store.everDone[taskKey] = true; // fait avancer le palier (monotone)
-    } else {
-      delete ds.done[taskKey];
-    }
-    saveStore(store);
+    if (checked) ds.done[taskKey] = true;
+    else delete ds.done[taskKey];
+    saveStore();
     render();
   }
 
-  // ---------- Petit feedback de fin de journée ----------
-  let lastCelebrated = "";
+  // ---------- Feedback ----------
   function celebrate(key) {
     if (lastCelebrated === key) return;
     lastCelebrated = key;
@@ -322,7 +321,7 @@
     lastCelebrated = "";
     render();
   });
-  el("editStage").addEventListener("click", () => showSetup());
+  el("editStage").addEventListener("click", () => showSetup(false));
 
   // ---------- Installation PWA ----------
   let deferredPrompt = null;
@@ -348,5 +347,5 @@
   }
 
   if (store.onboarded) render();
-  else showSetup();
+  else showSetup(true);
 })();
