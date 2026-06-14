@@ -98,6 +98,24 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
 .item.truncated .item-chev { display: block; }
 .item.expanded .item-chev { transform: rotate(180deg); }
 
+/* ---------- Écran de démarrage (« où en es-tu ? ») ---------- */
+.setup { display: flex; flex-direction: column; gap: 9px; }
+.setup-intro {
+  margin: 0 0 6px; font-size: 14px; line-height: 1.5; color: var(--muted-strong);
+}
+.stage-card {
+  display: flex; align-items: flex-start; gap: 12px; text-align: left;
+  width: 100%; background: var(--bg); color: var(--text);
+  border: 1px solid var(--line); border-radius: 9px;
+  padding: 14px; cursor: pointer; transition: background 0.08s, border-color 0.08s;
+}
+.stage-card:hover { background: var(--hover); border-color: rgba(55, 53, 47, 0.18); }
+.stage-card:active { background: var(--hover); }
+.stage-emoji { font-size: 22px; line-height: 1.2; flex: 0 0 auto; }
+.stage-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.stage-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.stage-goal { font-size: 13px; line-height: 1.4; color: var(--muted-strong); }
+
 /* ---------- Footer ---------- */
 .foot {
   text-align: center;
