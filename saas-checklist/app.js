@@ -18,17 +18,6 @@
   const msByPhase = {};
   PHASES.forEach((p) => (msByPhase[p.id] = MILESTONES.filter((m) => m.phase === p.id)));
 
-  // ---------- Date ----------
-  const fmtKey = (d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
-  const dayNumber = (d) =>
-    Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000);
-  const todayKey = () => fmtKey(new Date());
-
   // ---------- Hash + PRNG ----------
   function hashStr(str) {
     let h = 2166136261 >>> 0;
@@ -70,8 +59,8 @@
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
   }
   let store = loadStore();
-  if (!store.days) store.days = {};
   if (!store.milestones) store.milestones = {};
+  if (!store.batchDone) store.batchDone = {};
 
   // ---------- Étape courante = 1ère étape dont les jalons ne sont pas tous faits ----------
   function phaseDone(p) {
@@ -87,9 +76,10 @@
   }
   const milestonesDoneCount = () => MILESTONES.filter((m) => store.milestones[m.id]).length;
 
-  // ---------- Sélection du jour (liste courte, répartie entre catégories) ----------
-  function generateForDate(d, phase) {
-    const dn = dayNumber(d);
+  // ---------- Génération d'une liste (répartie entre catégories) ----------
+  // `n` est l'index de la liste : il n'avance que lorsque la liste est terminée,
+  // donc la liste reste STABLE tant que tout n'est pas coché.
+  function genKeys(phase, n) {
     const cats = [];
     for (const id of PRIORITY) {
       const cat = CATS.find((c) => c.id === id);
@@ -99,7 +89,7 @@
       });
       if (!eligible.length) continue;
       const order = seededOrder(eligible.length, hashStr(cat.id + "@" + phase));
-      const start = ((dn % eligible.length) + eligible.length) % eligible.length;
+      const start = ((n % eligible.length) + eligible.length) % eligible.length;
       cats.push({ cat, eligible, order, start, taken: 0 });
     }
     const out = [];
@@ -110,7 +100,7 @@
         if (out.length >= DAILY_COUNT) break;
         if (c.taken >= c.eligible.length) continue;
         const idx = c.eligible[c.order[(c.start + c.taken) % c.eligible.length]];
-        out.push({ cat: c.cat, key: `${c.cat.id}#${idx}`, text: c.cat.tasks[idx].t });
+        out.push(`${c.cat.id}#${idx}`);
         c.taken++;
         progress = true;
       }
@@ -118,18 +108,46 @@
     return out;
   }
 
-  function dayState(key) {
-    if (!store.days[key]) store.days[key] = { done: {} };
-    if (!store.days[key].done) store.days[key].done = {};
-    return store.days[key];
+  function resolveTask(key) {
+    const hash = key.indexOf("#");
+    const cid = key.slice(0, hash);
+    const idx = parseInt(key.slice(hash + 1), 10);
+    const cat = CATS.find((c) => c.id === cid);
+    return { cat, text: cat.tasks[idx].t };
+  }
+
+  // La liste courante est conservée tant qu'elle n'est pas entièrement cochée.
+  // Elle ne change que dans 2 cas : (1) tout est coché → liste suivante,
+  // (2) l'étape change (jalon coché) → liste adaptée à la nouvelle étape.
+  function ensureBatch() {
+    const phase = currentPhase();
+    const b = store.batch;
+    if (!b || b.phase !== phase || !Array.isArray(b.keys)) {
+      const n = b && typeof b.n === "number" ? b.n : 0;
+      store.batch = { phase, n, keys: genKeys(phase, n) };
+      store.batchDone = {};
+      saveStore();
+    }
+  }
+
+  function advanceIfDone() {
+    const keys = store.batch.keys || [];
+    if (keys.length && keys.every((k) => store.batchDone[k])) {
+      const phase = currentPhase();
+      const n = store.batch.n + 1;
+      store.batch = { phase, n, keys: genKeys(phase, n) };
+      store.batchDone = {};
+      saveStore();
+      showToast("✅ Liste terminée — voici la suite !");
+      return true;
+    }
+    return false;
   }
 
   // ---------- DOM ----------
   const el = (id) => document.getElementById(id);
   const listEl = el("list");
   const setupEl = el("setup");
-  let viewDate = new Date();
-  let lastCelebrated = "";
 
   function frenchDate(d) {
     const s = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
@@ -162,8 +180,6 @@
     saveStore();
     setupEl.className = "setup";
     setupMode(false);
-    viewDate = new Date();
-    lastCelebrated = "";
     render();
   }
 
@@ -418,34 +434,16 @@
   }
 
 
-  // ---------- Rendu de la liste du jour ----------
+  // ---------- Rendu de la liste courante ----------
   function render() {
-    const key = fmtKey(viewDate);
-    const ds = dayState(key);
-    const phase = currentPhase();
-    const items = generateForDate(viewDate, phase);
-
-    const diff = dayNumber(viewDate) - dayNumber(new Date());
-    let title;
-    if (diff === 0) title = "Aujourd'hui";
-    else if (diff === -1) title = "Hier";
-    else if (diff === 1) title = "Demain";
-    else {
-      const wd = viewDate.toLocaleDateString("fr-FR", { weekday: "long" });
-      title = wd.charAt(0).toUpperCase() + wd.slice(1);
-    }
-    el("title").textContent = title;
-    el("dateLabel").textContent = frenchDate(viewDate);
-    el("nextDay").disabled = key >= todayKey();
+    ensureBatch();
+    el("title").textContent = "Aujourd'hui";
+    el("dateLabel").textContent = frenchDate(new Date());
 
     listEl.innerHTML = "";
-    let total = 0;
-    let done = 0;
-
-    for (const item of items) {
-      total++;
-      const checked = !!ds.done[item.key];
-      if (checked) done++;
+    for (const key of store.batch.keys) {
+      const { cat, text } = resolveTask(key);
+      const checked = !!store.batchDone[key];
 
       const row = document.createElement("div");
       row.className = "item" + (checked ? " checked" : "");
@@ -453,15 +451,15 @@
       const box = document.createElement("input");
       box.type = "checkbox";
       box.checked = checked;
-      box.addEventListener("change", () => toggle(key, item.key, box.checked));
+      box.addEventListener("change", () => toggle(key, box.checked));
 
       const emoji = document.createElement("span");
       emoji.className = "item-emoji";
-      emoji.textContent = item.cat.emoji;
+      emoji.textContent = cat.emoji;
 
       const txt = document.createElement("span");
       txt.className = "item-text";
-      txt.textContent = item.text;
+      txt.textContent = text;
 
       const chev = document.createElement("span");
       chev.className = "item-chev";
@@ -481,19 +479,17 @@
 
       if (txt.scrollHeight - txt.clientHeight > 1) row.classList.add("truncated");
     }
-
-    if (total && done === total) celebrate(key);
   }
 
-  function toggle(key, taskKey, checked) {
-    const ds = dayState(key);
+  function toggle(key, checked) {
     if (checked) {
-      ds.done[taskKey] = true;
+      store.batchDone[key] = true;
       playWin();
     } else {
-      delete ds.done[taskKey];
+      delete store.batchDone[key];
     }
     saveStore();
+    advanceIfDone(); // si tout est coché → liste suivante
     render();
   }
 
@@ -523,11 +519,6 @@
   }
 
   // ---------- Feedback ----------
-  function celebrate(key) {
-    if (lastCelebrated === key) return;
-    lastCelebrated = key;
-    showToast("🎉 Tout est fait pour aujourd'hui — bravo !");
-  }
   let toastTimer;
   function showToast(msg) {
     const t = el("toast");
@@ -537,25 +528,7 @@
     toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
   }
 
-  // ---------- Navigation ----------
-  el("prevDay").addEventListener("click", () => {
-    viewDate.setDate(viewDate.getDate() - 1);
-    viewDate = new Date(viewDate);
-    lastCelebrated = "";
-    render();
-  });
-  el("nextDay").addEventListener("click", () => {
-    if (fmtKey(viewDate) >= todayKey()) return;
-    viewDate.setDate(viewDate.getDate() + 1);
-    viewDate = new Date(viewDate);
-    lastCelebrated = "";
-    render();
-  });
-  el("todayBtn").addEventListener("click", () => {
-    viewDate = new Date();
-    lastCelebrated = "";
-    render();
-  });
+  // ---------- Actions ----------
   el("editStage").addEventListener("click", () => showProgress());
 
   // ---------- Installation PWA ----------
