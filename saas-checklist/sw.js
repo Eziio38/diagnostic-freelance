@@ -1,6 +1,6 @@
 /* Service worker — met en cache la coquille de l'app pour un fonctionnement
    100 % hors-ligne. L'app est entièrement locale, aucun appel réseau requis. */
-const CACHE = "saas-daily-v4";
+const CACHE = "saas-daily-v5";
 const SHELL = [
   "./",
   "./index.html",
