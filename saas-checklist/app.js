@@ -165,7 +165,7 @@
       const checked = !!ds.done[item.key];
       if (checked) done++;
 
-      const row = document.createElement("label");
+      const row = document.createElement("div");
       row.className = "item" + (checked ? " checked" : "");
 
       const box = document.createElement("input");
@@ -181,10 +181,26 @@
       txt.className = "item-text";
       txt.textContent = item.text;
 
+      const chev = document.createElement("span");
+      chev.className = "item-chev";
+      chev.textContent = "⌄";
+
+      // Taper le texte (ou le chevron) déplie / replie le détail complet.
+      const expand = (e) => {
+        e.preventDefault();
+        row.classList.toggle("expanded");
+      };
+      txt.addEventListener("click", expand);
+      chev.addEventListener("click", expand);
+
       row.appendChild(box);
       row.appendChild(emoji);
       row.appendChild(txt);
+      row.appendChild(chev);
       listEl.appendChild(row);
+
+      // Afficher le chevron uniquement si le texte est réellement tronqué.
+      if (txt.scrollHeight - txt.clientHeight > 1) row.classList.add("truncated");
     }
 
     if (total && done === total) celebrate(key);
