@@ -1,13 +1,19 @@
-/* SaaS Daily (Sidian) — check-list quotidienne adaptée au palier de croissance.
-   Génération déterministe par date + filtrage par palier + persistance locale. */
+/* SaaS Daily (Sidian) — check-list quotidienne.
+   Le palier de croissance s'adapte AUTOMATIQUEMENT aux tâches réalisées :
+   chaque tâche est rattachée à son palier le plus précoce (les tâches de
+   routine récurrentes sont exclues du calcul) ; quand ~70 % des tâches propres
+   à un palier ont été cochées (sur l'ensemble de l'historique), on passe au
+   palier suivant. La progression ne redescend jamais. */
 
 (() => {
   "use strict";
 
-  const STORE_KEY = "saasDaily:v2";
+  const STORE_KEY = "saasDaily:v3";
   const CATS = window.CATEGORIES;
   const PHASES = window.PHASES;
+  const MIN_PHASE = PHASES[0].id;
   const MAX_PHASE = PHASES[PHASES.length - 1].id;
+  const ADVANCE_RATIO = 0.7; // part des tâches propres au palier à réaliser pour avancer
 
   // ---------- Utilitaires date ----------
   const fmtKey = (d) => {
@@ -51,10 +57,37 @@
     return idx;
   }
 
-  // Sélection des tâches d'un jour pour un palier donné.
-  // On ne garde que les tâches éligibles au palier, puis chaque catégorie a un
-  // ordre stable propre (palier inclus dans la graine) ; la fenêtre avance
-  // chaque jour pour parcourir tout le réservoir éligible avant de boucler.
+  // ---------- Tâches propres à chaque palier (pour la progression auto) ----------
+  // Une tâche présente dans 5 paliers ou plus est « transversale » (routine,
+  // focus, stratégie permanente) → exclue du calcul d'avancement.
+  const isCrossCutting = (task) => task.p.length >= 5;
+  const primaryByPhase = {};
+  PHASES.forEach((p) => (primaryByPhase[p.id] = []));
+  CATS.forEach((cat) => {
+    cat.tasks.forEach((task, i) => {
+      if (isCrossCutting(task)) return;
+      const primary = Math.min.apply(null, task.p);
+      primaryByPhase[primary].push(`${cat.id}#${i}`);
+    });
+  });
+
+  function phaseCompletion(phase, everDone) {
+    const list = primaryByPhase[phase] || [];
+    if (!list.length) return { done: 0, total: 0, ratio: 1 };
+    const done = list.filter((k) => everDone[k]).length;
+    return { done, total: list.length, ratio: done / list.length };
+  }
+  function phaseValidated(phase, everDone) {
+    return phaseCompletion(phase, everDone).ratio >= ADVANCE_RATIO;
+  }
+  function currentPhase(everDone) {
+    for (let p = MIN_PHASE; p < MAX_PHASE; p++) {
+      if (!phaseValidated(p, everDone)) return p;
+    }
+    return MAX_PHASE;
+  }
+
+  // ---------- Génération du jour selon le palier ----------
   function generateForDate(d, phase) {
     const dn = dayNumber(d);
     const out = [];
@@ -70,18 +103,13 @@
       const picks = [];
       for (let k = 0; k < count; k++) {
         const taskIndex = eligible[order[(start + k) % eligible.length]];
-        picks.push({
-          key: `${cat.id}#${taskIndex}`,
-          text: cat.tasks[taskIndex].t,
-        });
+        picks.push({ key: `${cat.id}#${taskIndex}`, text: cat.tasks[taskIndex].t });
       }
       out.push({ cat, picks });
     }
     return out;
   }
 
-  // Tâche « cap suivant » : une tâche du palier d'après (pas encore éligible
-  // aujourd'hui), pour préparer l'objectif futur tout en restant réalisable.
   function horizonForDate(d, phase) {
     const next = phase + 1;
     if (next > MAX_PHASE) return null;
@@ -101,16 +129,22 @@
   // ---------- Persistance ----------
   function loadStore() {
     try {
-      return JSON.parse(localStorage.getItem(STORE_KEY)) || { days: {}, phase: 1 };
+      return JSON.parse(localStorage.getItem(STORE_KEY)) || { days: {}, everDone: {} };
     } catch {
-      return { days: {}, phase: 1 };
+      return { days: {}, everDone: {} };
     }
   }
   function saveStore(s) {
     localStorage.setItem(STORE_KEY, JSON.stringify(s));
   }
   let store = loadStore();
-  if (typeof store.phase !== "number") store.phase = 1;
+  if (!store.days) store.days = {};
+  if (!store.everDone) store.everDone = {};
+  // Reconstituer l'historique des tâches cochées (au cas où) pour la progression.
+  for (const key in store.days) {
+    const done = store.days[key].done || {};
+    for (const k in done) if (done[k]) store.everDone[k] = true;
+  }
 
   function dayState(key) {
     if (!store.days[key]) store.days[key] = { done: {}, custom: [] };
@@ -195,7 +229,7 @@
   function render() {
     const key = fmtKey(viewDate);
     const ds = dayState(key);
-    const phase = store.phase;
+    const phase = currentPhase(store.everDone);
     const groups = generateForDate(viewDate, phase);
     const horizon = horizonForDate(viewDate, phase);
 
@@ -204,11 +238,18 @@
       key === todayKey() ? frenchDate(viewDate) + " · aujourd'hui" : frenchDate(viewDate);
     el("nextDay").disabled = key >= todayKey();
 
-    // Palier
+    // Palier (automatique, lecture seule)
     const ph = PHASES.find((p) => p.id === phase);
-    el("phaseSelect").value = String(phase);
+    const comp = phaseCompletion(phase, store.everDone);
+    const pphase = comp.total ? Math.round(comp.ratio * 100) : 100;
+    el("phaseBadge").textContent = `Palier ${ph.id} · ${ph.emoji} ${ph.name}`;
+    el("phasePct").textContent = comp.total ? `${pphase}%` : "✓";
+    el("phaseMiniFill").style.width = (comp.total ? Math.min(100, pphase) : 100) + "%";
     el("phaseGoal").textContent = ph.goal;
-    el("phaseDone").textContent = "Palier validé quand : " + ph.done;
+    const nextPh = PHASES.find((p) => p.id === phase + 1);
+    el("phaseNext").textContent = nextPh
+      ? `Prochain palier : ${nextPh.emoji} ${nextPh.name}`
+      : "Dernier palier — objectif 2 000€/mois 🎯";
 
     listEl.innerHTML = "";
     let total = 0;
@@ -249,7 +290,7 @@
       if (isChecked(ds, horizon)) done++;
       const section = document.createElement("section");
       section.className = "cat horizon";
-      section.style.setProperty("--cat", "#eab308");
+      section.style.setProperty("--cat", "#c79a1e");
       const head = document.createElement("div");
       head.className = "cat-head";
       head.innerHTML =
@@ -257,7 +298,7 @@
       section.appendChild(head);
       const items = document.createElement("div");
       items.className = "items";
-      items.appendChild(makeRow(key, ds, { ...horizon, custom: false }, "#eab308"));
+      items.appendChild(makeRow(key, ds, { ...horizon, custom: false }, "#c79a1e"));
       section.appendChild(items);
       listEl.appendChild(section);
     }
@@ -276,8 +317,12 @@
       const c = ds.custom.find((x) => x.id === item.key);
       if (c) c.done = checked;
     } else {
-      if (checked) ds.done[item.key] = true;
-      else delete ds.done[item.key];
+      if (checked) {
+        ds.done[item.key] = true;
+        store.everDone[item.key] = true; // progression du palier (monotone)
+      } else {
+        delete ds.done[item.key];
+      }
     }
     saveStore(store);
     render();
@@ -320,7 +365,7 @@
     toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
   }
 
-  // ---------- Navigation & contrôles ----------
+  // ---------- Navigation ----------
   el("prevDay").addEventListener("click", () => {
     viewDate.setDate(viewDate.getDate() - 1);
     viewDate = new Date(viewDate);
@@ -336,21 +381,6 @@
   });
   el("todayBtn").addEventListener("click", () => {
     viewDate = new Date();
-    lastCelebrated = "";
-    render();
-  });
-
-  // Sélecteur de palier
-  const phaseSelect = el("phaseSelect");
-  for (const p of PHASES) {
-    const opt = document.createElement("option");
-    opt.value = String(p.id);
-    opt.textContent = `${p.id}. ${p.emoji} ${p.name}`;
-    phaseSelect.appendChild(opt);
-  }
-  phaseSelect.addEventListener("change", () => {
-    store.phase = parseInt(phaseSelect.value, 10);
-    saveStore(store);
     lastCelebrated = "";
     render();
   });
