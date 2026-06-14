@@ -242,7 +242,8 @@
     const ph = PHASES.find((p) => p.id === phase);
     const comp = phaseCompletion(phase, store.everDone);
     const pphase = comp.total ? Math.round(comp.ratio * 100) : 100;
-    el("phaseBadge").textContent = `Palier ${ph.id} · ${ph.emoji} ${ph.name}`;
+    el("phaseIcon").textContent = ph.emoji;
+    el("phaseBadge").textContent = `Palier ${ph.id} · ${ph.name}`;
     el("phasePct").textContent = comp.total ? `${pphase}%` : "✓";
     el("phaseMiniFill").style.width = (comp.total ? Math.min(100, pphase) : 100) + "%";
     el("phaseGoal").textContent = ph.goal;
