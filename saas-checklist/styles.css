@@ -11,6 +11,9 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* L'attribut `hidden` doit toujours masquer, même quand un display:flex est défini. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
