@@ -101,8 +101,64 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
 .item.truncated .item-chev { display: block; }
 .item.expanded .item-chev { transform: rotate(180deg); }
 
+/* ---------- Onboarding (parcours guidé, thème Notion) ---------- */
+.setup { flex: 1; display: flex; flex-direction: column; gap: 18px; padding-bottom: 8px; }
+.setup.wizard { gap: 0; }
+
+.wiz-dots { display: flex; gap: 6px; justify-content: center; padding: 2px 0 18px; }
+.wiz-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(55, 53, 47, 0.15); transition: background 0.2s, width 0.2s;
+}
+.wiz-dot.done { background: rgba(55, 53, 47, 0.35); }
+.wiz-dot.on { background: var(--accent); width: 20px; border-radius: 999px; }
+
+.wiz-body { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+
+.wiz-hero { margin: auto 0; text-align: center; padding: 12px 0; }
+.wiz-hero-icon {
+  font-size: 52px; line-height: 1; margin-bottom: 18px;
+}
+.wiz-h2 { margin: 0 0 12px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.wiz-p { margin: 0 0 10px; font-size: 15px; line-height: 1.5; color: var(--muted-strong); }
+.wiz-hero .wiz-p { max-width: 360px; margin-left: auto; margin-right: auto; }
+
+.wiz-foot { display: flex; gap: 10px; padding: 16px 0 4px; }
+.btn-primary {
+  flex: 1; background: var(--accent); color: #fff; border: 0; border-radius: 9px;
+  padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+.btn-primary:not(:disabled):hover { filter: brightness(0.96); }
+.btn-ghost {
+  flex: 0 0 auto; background: transparent; color: var(--muted-strong);
+  border: 1px solid var(--line); border-radius: 9px;
+  padding: 14px 18px; font-size: 15px; font-weight: 500; cursor: pointer;
+}
+.btn-ghost:hover { background: var(--hover); }
+
+/* Cartes d'étape (sélection unique) */
+.stage-list { display: flex; flex-direction: column; gap: 8px; }
+.stage-card {
+  display: flex; align-items: center; gap: 12px; text-align: left; width: 100%;
+  background: var(--bg); color: var(--text);
+  border: 1.5px solid var(--line); border-radius: 10px;
+  padding: 14px; cursor: pointer; transition: background 0.08s, border-color 0.08s;
+}
+.stage-card:hover { background: var(--hover); }
+.stage-card.selected { border-color: var(--accent); background: rgba(35, 131, 226, 0.06); }
+.stage-emoji { font-size: 22px; line-height: 1.2; flex: 0 0 auto; }
+.stage-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.stage-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.stage-goal { font-size: 13px; line-height: 1.4; color: var(--muted-strong); }
+.stage-check {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800;
+  background: var(--accent); opacity: 0; transform: scale(0.6); transition: opacity 0.15s, transform 0.15s;
+}
+.stage-card.selected .stage-check { opacity: 1; transform: scale(1); }
+
 /* ---------- Écran « Mon avancement » (jalons) ---------- */
-.setup { display: flex; flex-direction: column; gap: 18px; padding-bottom: 8px; }
 .setup-intro {
   margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted-strong);
 }
