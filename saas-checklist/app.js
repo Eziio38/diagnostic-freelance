@@ -200,7 +200,7 @@
     cta.className = "setup-cta";
     cta.textContent = "Voir mes tâches du jour →";
     cta.addEventListener("click", () => {
-      store.onboarded = true;
+      store.setupDone = true;
       saveStore();
       setupMode(false);
       viewDate = new Date();
@@ -346,6 +346,6 @@
     );
   }
 
-  if (store.onboarded) render();
+  if (store.setupDone) render();
   else showSetup(true);
 })();
