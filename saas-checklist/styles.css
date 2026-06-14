@@ -29,7 +29,7 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
-  padding: calc(env(safe-area-inset-top) + 22px) 22px 8px;
+  padding: calc(env(safe-area-inset-top) + 16px) 20px 4px;
   display: flex;
   flex-direction: column;
 }
@@ -38,40 +38,40 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
 .page-head {
   display: flex;
   align-items: center;
-  gap: 13px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
-.page-icon { font-size: 34px; line-height: 1; flex: 0 0 auto; }
+.page-icon { font-size: 30px; line-height: 1; flex: 0 0 auto; }
 .page-titles { flex: 1; min-width: 0; }
 .page-titles h1 {
   margin: 0;
-  font-size: 27px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text);
 }
-.tagline { margin: 2px 0 0; font-size: 14px; color: var(--muted-strong); }
+.tagline { margin: 1px 0 0; font-size: 13px; color: var(--muted-strong); }
 
 .daynav { display: flex; gap: 2px; flex: 0 0 auto; }
 .nav {
-  width: 34px; height: 34px; border-radius: 7px;
+  width: 32px; height: 32px; border-radius: 7px;
   background: transparent; color: var(--muted-strong);
-  border: 0; font-size: 19px; line-height: 1; cursor: pointer;
+  border: 0; font-size: 18px; line-height: 1; cursor: pointer;
 }
 .nav:hover { background: var(--hover); }
 .nav:disabled { opacity: 0.25; cursor: default; background: transparent; }
 
-/* ---------- To-do list (style Notion) ---------- */
-.list { display: flex; flex-direction: column; gap: 2px; }
+/* ---------- To-do list (style Notion, compact) ---------- */
+.list { display: flex; flex-direction: column; gap: 1px; }
 .item {
-  display: flex; align-items: flex-start; gap: 11px;
-  padding: 12px 8px; border-radius: 5px; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 8px; border-radius: 5px; cursor: pointer;
   transition: background 0.08s;
 }
 .item:hover { background: var(--hover); }
 .item input[type="checkbox"] {
   appearance: none; -webkit-appearance: none;
-  width: 18px; height: 18px; margin: 2px 0 0; flex: 0 0 auto;
+  width: 17px; height: 17px; margin: 2px 0 0; flex: 0 0 auto;
   border: 1.5px solid rgba(55, 53, 47, 0.4); border-radius: 3px;
   background: transparent; cursor: pointer; position: relative;
   transition: background 0.12s, border-color 0.12s;
@@ -79,10 +79,13 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
 .item input[type="checkbox"]:checked { background: var(--done); border-color: var(--done); }
 .item input[type="checkbox"]:checked::after {
   content: "✓"; position: absolute; inset: -1px 0 0 0;
-  display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800;
+  display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 800;
 }
-.item-emoji { font-size: 17px; line-height: 1.4; flex: 0 0 auto; }
-.item-text { font-size: 16px; line-height: 1.45; flex: 1; color: var(--text); }
+.item-emoji { font-size: 15px; line-height: 1.35; flex: 0 0 auto; }
+.item-text {
+  font-size: 14.5px; line-height: 1.35; flex: 1; color: var(--text);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .item.checked .item-text { color: var(--muted); text-decoration: line-through; }
 .item.checked .item-emoji { opacity: 0.45; }
 

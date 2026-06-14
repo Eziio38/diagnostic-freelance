@@ -12,7 +12,7 @@
   const MIN_PHASE = PHASES[0].id;
   const MAX_PHASE = PHASES[PHASES.length - 1].id;
   const ADVANCE_RATIO = 0.7;        // part des tâches propres au palier pour avancer
-  const DAILY_COUNT = 5;            // nombre de tâches affichées par jour (tient sans scroll)
+  const DAILY_COUNT = 8;            // nombre de tâches affichées par jour
   // Ordre de priorité d'affichage des catégories (1 tâche par catégorie / jour).
   const PRIORITY = ["cursor", "tests", "produit", "marketing", "croissance", "strategie", "routine"];
 
@@ -81,9 +81,9 @@
   // ---------- Sélection du jour (liste courte et plate) ----------
   function generateForDate(d, phase) {
     const dn = dayNumber(d);
-    const out = [];
+    // Catégories éligibles au palier, chacune avec son ordre stable + point de départ.
+    const cats = [];
     for (const id of PRIORITY) {
-      if (out.length >= DAILY_COUNT) break;
       const cat = CATS.find((c) => c.id === id);
       const eligible = [];
       cat.tasks.forEach((task, i) => {
@@ -92,8 +92,21 @@
       if (!eligible.length) continue;
       const order = seededOrder(eligible.length, hashStr(cat.id + "@" + phase));
       const start = ((dn % eligible.length) + eligible.length) % eligible.length;
-      const idx = eligible[order[start]];
-      out.push({ cat, key: `${cat.id}#${idx}`, text: cat.tasks[idx].t });
+      cats.push({ cat, eligible, order, start, taken: 0 });
+    }
+    // Round-robin : on répartit entre catégories, sans répéter une tâche dans la journée.
+    const out = [];
+    let progress = true;
+    while (out.length < DAILY_COUNT && progress) {
+      progress = false;
+      for (const c of cats) {
+        if (out.length >= DAILY_COUNT) break;
+        if (c.taken >= c.eligible.length) continue;
+        const idx = c.eligible[c.order[(c.start + c.taken) % c.eligible.length]];
+        out.push({ cat: c.cat, key: `${c.cat.id}#${idx}`, text: c.cat.tasks[idx].t });
+        c.taken++;
+        progress = true;
+      }
     }
     return out;
   }
