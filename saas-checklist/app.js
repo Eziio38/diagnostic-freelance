@@ -136,7 +136,7 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
-  // ---------- Écran « Mon avancement » (jalons) ----------
+  // ---------- Bascule entre écrans (onboarding / avancement) et liste ----------
   function setupMode(on) {
     // Masquage infaillible : style inline (prioritaire sur le CSS) + attribut hidden.
     setupEl.hidden = !on;
@@ -145,32 +145,243 @@
     listEl.style.display = on ? "none" : "flex";
     el("dateLabel").style.visibility = on ? "hidden" : "";
     document.querySelectorAll(".daynav .nav").forEach((b) => {
-      if (b.id !== "editStage") b.style.display = on ? "none" : "";
+      b.style.display = on ? "none" : "";
     });
   }
 
-  function showSetup(firstRun) {
-    el("title").textContent = firstRun ? "Où en es-tu ?" : "Mon avancement";
+  function phaseFrom(ms) {
+    for (let p = MIN_PHASE; p < MAX_PHASE; p++) {
+      const list = msByPhase[p] || [];
+      if (list.length && !list.every((m) => ms[m.id])) return p;
+    }
+    return MAX_PHASE;
+  }
+
+  function closeSetup() {
+    store.setupDone = true;
+    saveStore();
+    setupEl.className = "setup";
+    setupMode(false);
+    viewDate = new Date();
+    lastCelebrated = "";
+    render();
+  }
+
+  // ---------- Onboarding : parcours guidé multi-étapes ----------
+  const WIZ_STEPS = 4;
+  let wiz = { step: 0, stage: null, checked: {} };
+
+  function startWizard() {
+    wiz = { step: 0, stage: null, checked: {} };
+    setupMode(true);
+    renderWizard();
+  }
+
+  function navButtons(opts) {
+    const foot = document.createElement("div");
+    foot.className = "wiz-foot";
+    if (opts.back) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn-ghost";
+      b.textContent = "Retour";
+      b.addEventListener("click", opts.back);
+      foot.appendChild(b);
+    }
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "btn-primary";
+    next.textContent = opts.nextLabel || "Continuer";
+    next.disabled = !!opts.nextDisabled;
+    next.addEventListener("click", opts.next);
+    foot.appendChild(next);
+    return foot;
+  }
+
+  function renderWizard() {
+    setupEl.className = "setup wizard";
     setupEl.innerHTML = "";
+
+    const dots = document.createElement("div");
+    dots.className = "wiz-dots";
+    for (let i = 0; i < WIZ_STEPS; i++) {
+      const d = document.createElement("span");
+      d.className = "wiz-dot" + (i === wiz.step ? " on" : "") + (i < wiz.step ? " done" : "");
+      dots.appendChild(d);
+    }
+    setupEl.appendChild(dots);
+
+    const body = document.createElement("div");
+    body.className = "wiz-body";
+    setupEl.appendChild(body);
+
+    if (wiz.step === 0) stepWelcome(body);
+    else if (wiz.step === 1) stepStage(body);
+    else if (wiz.step === 2) stepRefine(body);
+    else stepDone(body);
+  }
+
+  function stepWelcome(body) {
+    el("title").textContent = "Bienvenue 👋";
+    body.innerHTML =
+      `<div class="wiz-hero">` +
+      `<div class="wiz-hero-icon">✅</div>` +
+      `<h2 class="wiz-h2">Construis Sidian, un jour à la fois</h2>` +
+      `<p class="wiz-p">Chaque jour, une courte liste de tâches concrètes pour faire avancer ton SaaS — Cursor/dev, stratégie, marketing… adaptée à là où tu en es.</p>` +
+      `<p class="wiz-p">En 30 secondes, dis-nous où tu en es.</p>` +
+      `</div>`;
+    setupEl.appendChild(
+      navButtons({
+        nextLabel: "Commencer",
+        next: () => {
+          wiz.step = 1;
+          renderWizard();
+        },
+      })
+    );
+  }
+
+  function stepStage(body) {
+    el("title").textContent = "Où en es-tu ?";
+    const sub = document.createElement("p");
+    sub.className = "wiz-p";
+    sub.textContent = "Choisis l'étape qui correspond le mieux à ta situation actuelle.";
+    body.appendChild(sub);
+
+    const wrap = document.createElement("div");
+    wrap.className = "stage-list";
+    for (const ph of PHASES) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "stage-card" + (wiz.stage === ph.id ? " selected" : "");
+      card.innerHTML =
+        `<span class="stage-emoji">${ph.emoji}</span>` +
+        `<span class="stage-info">` +
+        `<span class="stage-name">Étape ${ph.id} — ${ph.name}</span>` +
+        `<span class="stage-goal">${ph.goal}</span>` +
+        `</span>` +
+        `<span class="stage-check">✓</span>`;
+      card.addEventListener("click", () => {
+        wiz.stage = ph.id;
+        renderWizard();
+      });
+      wrap.appendChild(card);
+    }
+    body.appendChild(wrap);
+
+    setupEl.appendChild(
+      navButtons({
+        back: () => {
+          wiz.step = 0;
+          renderWizard();
+        },
+        nextDisabled: wiz.stage === null,
+        next: () => {
+          // Baseline : tout ce qui précède l'étape choisie est considéré comme fait.
+          wiz.checked = {};
+          for (let p = MIN_PHASE; p < wiz.stage; p++) {
+            (msByPhase[p] || []).forEach((m) => (wiz.checked[m.id] = true));
+          }
+          wiz.step = 2;
+          renderWizard();
+        },
+      })
+    );
+  }
+
+  function stepRefine(body) {
+    const ph = PHASES.find((p) => p.id === wiz.stage);
+    el("title").textContent = `Étape ${ph.id} — ${ph.name}`;
+    const sub = document.createElement("p");
+    sub.className = "wiz-p";
+    sub.textContent =
+      "Coche ce que tu as déjà fait à cette étape (laisse vide si tu débutes cette étape).";
+    body.appendChild(sub);
+
+    const group = document.createElement("div");
+    group.className = "ms-group";
+    for (const m of msByPhase[ph.id] || []) {
+      const row = document.createElement("label");
+      const checked = !!wiz.checked[m.id];
+      row.className = "ms-row" + (checked ? " checked" : "");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = checked;
+      box.addEventListener("change", () => {
+        if (box.checked) wiz.checked[m.id] = true;
+        else delete wiz.checked[m.id];
+        row.classList.toggle("checked", box.checked);
+      });
+      const txt = document.createElement("span");
+      txt.className = "ms-text";
+      txt.textContent = m.t;
+      row.appendChild(box);
+      row.appendChild(txt);
+      group.appendChild(row);
+    }
+    body.appendChild(group);
+
+    setupEl.appendChild(
+      navButtons({
+        back: () => {
+          wiz.step = 1;
+          renderWizard();
+        },
+        next: () => {
+          wiz.step = 3;
+          renderWizard();
+        },
+      })
+    );
+  }
+
+  function stepDone(body) {
+    el("title").textContent = "C'est parti 🚀";
+    const ph = PHASES.find((p) => p.id === phaseFrom(wiz.checked));
+    body.innerHTML =
+      `<div class="wiz-hero">` +
+      `<div class="wiz-hero-icon">${ph.emoji}</div>` +
+      `<h2 class="wiz-h2">Tu es à l'étape ${ph.id} — ${ph.name}</h2>` +
+      `<p class="wiz-p">Chaque jour, l'app te proposera une courte liste adaptée à cette étape. Quand tu termines un jalon, coche-le dans <b>⚙︎ Mon avancement</b> : ton étape avancera toute seule.</p>` +
+      `</div>`;
+    setupEl.appendChild(
+      navButtons({
+        back: () => {
+          wiz.step = 2;
+          renderWizard();
+        },
+        nextLabel: "Voir mes tâches",
+        next: () => {
+          store.milestones = { ...wiz.checked };
+          closeSetup();
+        },
+      })
+    );
+  }
+
+  // ---------- Écran « Mon avancement » (⚙︎, modifiable à tout moment) ----------
+  function showProgress() {
+    setupMode(true);
+    setupEl.className = "setup progress";
+    setupEl.innerHTML = "";
+    el("title").textContent = "Mon avancement";
 
     const intro = document.createElement("p");
     intro.className = "setup-intro";
     intro.textContent =
-      "Coche tout ce que tu as déjà fait. L'app saura précisément où tu en es et te proposera la suite. Reviens cocher un jalon dès qu'il est terminé.";
+      "Coche un jalon dès qu'il est terminé. L'app ajuste automatiquement ton étape et tes tâches du jour.";
     setupEl.appendChild(intro);
 
     for (const ph of PHASES) {
       const group = document.createElement("div");
       group.className = "ms-group";
-
       const head = document.createElement("div");
       head.className = "ms-head";
       const ms = msByPhase[ph.id] || [];
-      const doneN = ms.filter((m) => store.milestones[m.id]).length;
       head.innerHTML =
         `<span class="ms-emoji">${ph.emoji}</span>` +
         `<span class="ms-name">Étape ${ph.id} — ${ph.name}</span>` +
-        `<span class="ms-count">${doneN}/${ms.length}</span>`;
+        `<span class="ms-count">${ms.filter((m) => store.milestones[m.id]).length}/${ms.length}</span>`;
       group.appendChild(head);
 
       for (const m of ms) {
@@ -201,19 +412,11 @@
     const cta = document.createElement("button");
     cta.type = "button";
     cta.className = "setup-cta";
-    cta.textContent = "Voir mes tâches du jour →";
-    cta.addEventListener("click", () => {
-      store.setupDone = true;
-      saveStore();
-      setupMode(false);
-      viewDate = new Date();
-      lastCelebrated = "";
-      render();
-    });
+    cta.textContent = "Terminé";
+    cta.addEventListener("click", closeSetup);
     setupEl.appendChild(cta);
-
-    setupMode(true);
   }
+
 
   // ---------- Rendu de la liste du jour ----------
   function render() {
@@ -324,7 +527,7 @@
     lastCelebrated = "";
     render();
   });
-  el("editStage").addEventListener("click", () => showSetup(false));
+  el("editStage").addEventListener("click", () => showProgress());
 
   // ---------- Installation PWA ----------
   let deferredPrompt = null;
@@ -353,6 +556,6 @@
     setupMode(false);
     render();
   } else {
-    showSetup(true);
+    startWizard();
   }
 })();
