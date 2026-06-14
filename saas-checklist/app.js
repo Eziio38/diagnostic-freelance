@@ -487,10 +487,39 @@
 
   function toggle(key, taskKey, checked) {
     const ds = dayState(key);
-    if (checked) ds.done[taskKey] = true;
-    else delete ds.done[taskKey];
+    if (checked) {
+      ds.done[taskKey] = true;
+      playWin();
+    } else {
+      delete ds.done[taskKey];
+    }
     saveStore();
     render();
+  }
+
+  // Petit son de victoire (généré localement, aucun fichier, marche hors-ligne).
+  let audioCtx;
+  function playWin() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audioCtx = audioCtx || new AC();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const now = audioCtx.currentTime;
+      [[784, 0], [1175, 0.08]].forEach(([f, t]) => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = "sine";
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, now + t);
+        g.gain.exponentialRampToValueAtTime(0.16, now + t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.16);
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.start(now + t);
+        o.stop(now + t + 0.18);
+      });
+    } catch (e) {}
   }
 
   // ---------- Feedback ----------
