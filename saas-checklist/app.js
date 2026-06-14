@@ -138,8 +138,11 @@
 
   // ---------- Écran « Mon avancement » (jalons) ----------
   function setupMode(on) {
+    // Masquage infaillible : style inline (prioritaire sur le CSS) + attribut hidden.
     setupEl.hidden = !on;
     listEl.hidden = on;
+    setupEl.style.display = on ? "flex" : "none";
+    listEl.style.display = on ? "none" : "flex";
     el("dateLabel").style.visibility = on ? "hidden" : "";
     document.querySelectorAll(".daynav .nav").forEach((b) => {
       if (b.id !== "editStage") b.style.display = on ? "none" : "";
@@ -346,6 +349,10 @@
     );
   }
 
-  if (store.setupDone) render();
-  else showSetup(true);
+  if (store.setupDone) {
+    setupMode(false);
+    render();
+  } else {
+    showSetup(true);
+  }
 })();
