@@ -221,7 +221,7 @@
 
       const head = document.createElement("div");
       head.className = "cat-head";
-      head.innerHTML = `<span class="cat-emoji">${cat.emoji}</span><h2>${cat.name}</h2>`;
+      head.innerHTML = `<span class="cat-dot"></span><span class="cat-emoji">${cat.emoji}</span><h2>${cat.name}</h2>`;
       section.appendChild(head);
 
       const items = document.createElement("div");
