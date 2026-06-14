@@ -1,21 +1,19 @@
 :root {
   --bg: #ffffff;
-  --text: #37352f;             /* couleur de texte signature Notion */
+  --text: #37352f;
   --muted: rgba(55, 53, 47, 0.5);
   --muted-strong: rgba(55, 53, 47, 0.65);
   --hover: rgba(55, 53, 47, 0.06);
   --line: rgba(55, 53, 47, 0.09);
-  --callout-bg: #f7f6f3;
-  --accent: #2383e2;           /* bleu Notion */
+  --accent: #2383e2;
   --done: #2383e2;
-  --gold-bg: #fbf3db;          /* callout jaune Notion */
-  --gold-text: #a3791e;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 html, body {
   margin: 0;
+  height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Helvetica,
@@ -24,182 +22,87 @@ html, body {
   font-size: 16px;
 }
 
+body { display: flex; flex-direction: column; min-height: 100dvh; }
+
 .app {
-  max-width: 680px;
+  flex: 1;
+  width: 100%;
+  max-width: 640px;
   margin: 0 auto;
-  padding: env(safe-area-inset-top) 20px calc(env(safe-area-inset-bottom) + 32px);
-  min-height: 100vh;
+  padding: calc(env(safe-area-inset-top) + 22px) 22px 8px;
+  display: flex;
+  flex-direction: column;
 }
 
-/* ---------- Page header (titre type page Notion) ---------- */
+/* ---------- Header ---------- */
 .page-head {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 28px 0 16px;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 18px;
 }
-.page-icon { font-size: 38px; line-height: 1; flex: 0 0 auto; }
+.page-icon { font-size: 34px; line-height: 1; flex: 0 0 auto; }
 .page-titles { flex: 1; min-width: 0; }
-.title-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.title-line h1 {
+.page-titles h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: 27px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text);
 }
-.tagline { margin: 4px 0 0; font-size: 14px; color: var(--muted-strong); }
+.tagline { margin: 2px 0 0; font-size: 14px; color: var(--muted-strong); }
 
-.streak {
-  display: inline-flex; align-items: center; gap: 4px;
-  color: var(--muted-strong); font-weight: 600; font-size: 14px;
-  background: var(--hover); padding: 4px 10px; border-radius: 6px; flex: 0 0 auto;
-}
-.flame { font-size: 14px; }
-
-/* ---------- Callout (palier) ---------- */
-.callout {
-  display: flex;
-  gap: 10px;
-  background: var(--callout-bg);
-  border-radius: 6px;
-  padding: 16px;
-  margin: 6px 0 22px;
-}
-.callout-emoji { font-size: 20px; line-height: 1.4; flex: 0 0 auto; }
-.callout-body { flex: 1; min-width: 0; }
-.phase-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.phase-badge { font-size: 15px; font-weight: 600; color: var(--text); }
-.phase-pct { font-size: 13px; font-weight: 600; color: var(--accent); flex: 0 0 auto; }
-.phase-mini-track {
-  height: 6px; background: rgba(55, 53, 47, 0.12); border-radius: 999px;
-  overflow: hidden; margin: 10px 0 0;
-}
-.phase-mini-fill {
-  height: 100%; width: 0%; background: var(--accent); border-radius: 999px;
-  transition: width 0.35s ease;
-}
-.phase-goal { margin: 11px 0 0; font-size: 14px; line-height: 1.5; color: var(--text); }
-.phase-next { margin: 6px 0 0; font-size: 13px; color: var(--muted-strong); line-height: 1.4; }
-
-/* ---------- Date bar ---------- */
-.datebar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin: 0 0 14px;
-}
+.daynav { display: flex; gap: 2px; flex: 0 0 auto; }
 .nav {
-  width: 32px; height: 32px; border-radius: 6px;
+  width: 34px; height: 34px; border-radius: 7px;
   background: transparent; color: var(--muted-strong);
-  border: 0; font-size: 20px; line-height: 1; cursor: pointer;
+  border: 0; font-size: 19px; line-height: 1; cursor: pointer;
 }
 .nav:hover { background: var(--hover); }
-.nav:disabled { opacity: 0.3; cursor: default; background: transparent; }
-.dateinfo { text-align: center; flex: 1; }
-.today-btn {
-  background: transparent; border: 0; color: var(--accent);
-  font-size: 12px; font-weight: 600; cursor: pointer; padding: 0;
-}
-.date-label { font-size: 14px; font-weight: 600; margin-top: 1px; color: var(--text); }
+.nav:disabled { opacity: 0.25; cursor: default; background: transparent; }
 
-/* ---------- Daily progress ---------- */
-.progress-wrap { margin-bottom: 8px; }
-.progress-track {
-  height: 4px; background: var(--line); border-radius: 999px; overflow: hidden;
-}
-.progress-fill {
-  height: 100%; width: 0%; background: var(--accent);
-  border-radius: 999px; transition: width 0.35s ease;
-}
-.progress-text { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: right; }
-
-/* ---------- Catégories (sections type Notion, sans carte) ---------- */
-.list { margin-top: 12px; }
-.cat { margin-bottom: 22px; }
-.cat-head { display: flex; align-items: center; gap: 7px; padding: 2px 6px 4px; }
-.cat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cat, var(--accent)); flex: 0 0 auto; }
-.cat-emoji { font-size: 14px; }
-.cat-head h2 {
-  margin: 0; font-size: 12px; font-weight: 600; color: var(--muted-strong);
-  text-transform: uppercase; letter-spacing: 0.05em;
-}
-
-.cat.horizon { background: var(--gold-bg); border-radius: 6px; padding: 12px 10px 6px; }
-.cat.horizon .cat-head { padding-top: 0; }
-.cat.horizon .cat-head h2 {
-  color: var(--gold-text); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600;
-}
-
-/* ---------- To-do items (style Notion) ---------- */
-.items { display: flex; flex-direction: column; }
+/* ---------- To-do list (style Notion) ---------- */
+.list { display: flex; flex-direction: column; gap: 2px; }
 .item {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 7px 6px; border-radius: 4px; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 12px 8px; border-radius: 5px; cursor: pointer;
   transition: background 0.08s;
 }
 .item:hover { background: var(--hover); }
 .item input[type="checkbox"] {
   appearance: none; -webkit-appearance: none;
-  width: 16px; height: 16px; margin: 3px 0 0; flex: 0 0 auto;
+  width: 18px; height: 18px; margin: 2px 0 0; flex: 0 0 auto;
   border: 1.5px solid rgba(55, 53, 47, 0.4); border-radius: 3px;
   background: transparent; cursor: pointer; position: relative;
   transition: background 0.12s, border-color 0.12s;
 }
-.item input[type="checkbox"]:checked {
-  background: var(--done); border-color: var(--done);
-}
+.item input[type="checkbox"]:checked { background: var(--done); border-color: var(--done); }
 .item input[type="checkbox"]:checked::after {
   content: "✓"; position: absolute; inset: -1px 0 0 0;
-  display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 800;
+  display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800;
 }
-.item-text { font-size: 15px; line-height: 1.5; flex: 1; color: var(--text); }
+.item-emoji { font-size: 17px; line-height: 1.4; flex: 0 0 auto; }
+.item-text { font-size: 16px; line-height: 1.45; flex: 1; color: var(--text); }
 .item.checked .item-text { color: var(--muted); text-decoration: line-through; }
-
-.del {
-  background: transparent; border: 0; color: rgba(55, 53, 47, 0.3);
-  font-size: 13px; cursor: pointer; padding: 2px 6px; flex: 0 0 auto;
-  opacity: 0; transition: opacity 0.1s;
-}
-.item:hover .del { opacity: 1; }
-.del:hover { color: #eb5757; }
-
-/* ---------- Add custom (ligne "+ New" type Notion) ---------- */
-.add-custom { margin: 8px 0 18px; }
-#customForm { display: flex; gap: 8px; align-items: center; }
-#customCat {
-  background: transparent; color: var(--muted-strong);
-  border: 1px solid var(--line); border-radius: 6px;
-  padding: 7px 8px; font-size: 13px; max-width: 130px;
-  appearance: none; -webkit-appearance: none;
-}
-#customInput {
-  flex: 1; background: transparent; color: var(--text);
-  border: 0; border-bottom: 1px solid var(--line);
-  padding: 8px 4px; font-size: 14px; border-radius: 0;
-}
-#customInput::placeholder { color: var(--muted); }
-#customInput:focus, #customCat:focus { outline: none; border-color: var(--accent); }
-#customForm button {
-  width: 32px; height: 32px; border: 0; border-radius: 6px;
-  background: var(--accent); color: #fff; font-size: 20px; cursor: pointer;
-  display: grid; place-items: center;
-}
+.item.checked .item-emoji { opacity: 0.45; }
 
 /* ---------- Footer ---------- */
-.foot { text-align: center; padding: 8px 0; }
+.foot {
+  text-align: center;
+  padding: 10px 22px calc(env(safe-area-inset-bottom) + 14px);
+}
 .ghost {
   background: transparent; color: var(--muted-strong);
-  border: 1px solid var(--line); border-radius: 6px;
+  border: 1px solid var(--line); border-radius: 7px;
   padding: 9px 16px; font-size: 14px; font-weight: 500; cursor: pointer;
 }
 .ghost:hover { background: var(--hover); }
-.hint { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
 
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px);
   translate: -50% 20px;
-  background: var(--text); color: #fff;
-  border-radius: 8px;
+  background: var(--text); color: #fff; border-radius: 8px;
   padding: 11px 18px; font-size: 13.5px; font-weight: 500;
   box-shadow: 0 8px 24px rgba(15, 15, 15, 0.2);
   opacity: 0; pointer-events: none; transition: opacity 0.25s, translate 0.25s;
