@@ -136,6 +136,23 @@
     return store.days[key];
   }
 
+  // ---------- Démarrage : « où en es-tu ? » ----------
+  // Choisir une étape marque les étapes précédentes comme déjà faites, tout en
+  // conservant les vraies cases cochées dans l'historique.
+  function applyStage(n) {
+    const ed = {};
+    for (let p = MIN_PHASE; p < n; p++) {
+      (primaryByPhase[p] || []).forEach((k) => (ed[k] = true));
+    }
+    for (const key in store.days) {
+      const done = store.days[key].done || {};
+      for (const k in done) if (done[k]) ed[k] = true;
+    }
+    store.everDone = ed;
+    store.onboarded = true;
+    saveStore(store);
+  }
+
   // ---------- État de vue ----------
   let viewDate = new Date();
   const el = (id) => document.getElementById(id);
@@ -144,6 +161,48 @@
   function frenchDate(d) {
     const s = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
     return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  // ---------- Écran de démarrage ----------
+  const setupEl = el("setup");
+  function setupMode(on) {
+    setupEl.hidden = !on;
+    listEl.hidden = on;
+    el("dateLabel").style.visibility = on ? "hidden" : "";
+    document.querySelectorAll(".daynav .nav").forEach((b) => {
+      if (b.id !== "editStage") b.style.display = on ? "none" : "";
+    });
+  }
+  function showSetup() {
+    el("title").textContent = "Où en es-tu ?";
+    setupEl.innerHTML = "";
+
+    const intro = document.createElement("p");
+    intro.className = "setup-intro";
+    intro.textContent =
+      "Choisis ton étape actuelle. L'app marquera les étapes précédentes comme faites, te proposera les bonnes tâches, puis s'adaptera automatiquement.";
+    setupEl.appendChild(intro);
+
+    for (const ph of PHASES) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "stage-card";
+      card.innerHTML =
+        `<span class="stage-emoji">${ph.emoji}</span>` +
+        `<span class="stage-info">` +
+        `<span class="stage-name">Étape ${ph.id} — ${ph.name}</span>` +
+        `<span class="stage-goal">${ph.goal}</span>` +
+        `</span>`;
+      card.addEventListener("click", () => {
+        applyStage(ph.id);
+        setupMode(false);
+        viewDate = new Date();
+        lastCelebrated = "";
+        render();
+      });
+      setupEl.appendChild(card);
+    }
+    setupMode(true);
   }
 
   function render() {
@@ -263,6 +322,7 @@
     lastCelebrated = "";
     render();
   });
+  el("editStage").addEventListener("click", () => showSetup());
 
   // ---------- Installation PWA ----------
   let deferredPrompt = null;
@@ -287,5 +347,6 @@
     );
   }
 
-  render();
+  if (store.onboarded) render();
+  else showSetup();
 })();
