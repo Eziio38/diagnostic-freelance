@@ -86,8 +86,17 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
   font-size: 14.5px; line-height: 1.35; flex: 1; color: var(--text);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
+.item.expanded .item-text { -webkit-line-clamp: unset; overflow: visible; }
 .item.checked .item-text { color: var(--muted); text-decoration: line-through; }
 .item.checked .item-emoji { opacity: 0.45; }
+
+.item-chev {
+  flex: 0 0 auto; margin-top: 1px; color: var(--muted);
+  font-size: 15px; line-height: 1.2; display: none; cursor: pointer;
+  transition: transform 0.15s;
+}
+.item.truncated .item-chev { display: block; }
+.item.expanded .item-chev { transform: rotate(180deg); }
 
 /* ---------- Footer ---------- */
 .foot {
