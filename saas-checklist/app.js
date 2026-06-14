@@ -12,8 +12,9 @@
   const MILESTONES = window.MILESTONES;
   const MIN_PHASE = PHASES[0].id;
   const MAX_PHASE = PHASES[PHASES.length - 1].id;
-  const DAILY_COUNT = 8;
+  const DEFAULTS = { name: "Sidian", goal: 5000, daily: 8 };
   const PRIORITY = ["cursor", "tests", "produit", "marketing", "croissance", "strategie", "routine"];
+  const dailyCount = () => (store.settings && store.settings.daily) || DEFAULTS.daily;
 
   const msByPhase = {};
   PHASES.forEach((p) => (msByPhase[p.id] = MILESTONES.filter((m) => m.phase === p.id)));
@@ -61,6 +62,7 @@
   let store = loadStore();
   if (!store.milestones) store.milestones = {};
   if (!store.batchDone) store.batchDone = {};
+  if (!store.settings) store.settings = { ...DEFAULTS };
 
   // ---------- Étape courante = 1ère étape dont les jalons ne sont pas tous faits ----------
   function phaseDone(p) {
@@ -93,11 +95,12 @@
       cats.push({ cat, eligible, order, start, taken: 0 });
     }
     const out = [];
+    const limit = dailyCount();
     let progress = true;
-    while (out.length < DAILY_COUNT && progress) {
+    while (out.length < limit && progress) {
       progress = false;
       for (const c of cats) {
-        if (out.length >= DAILY_COUNT) break;
+        if (out.length >= limit) break;
         if (c.taken >= c.eligible.length) continue;
         const idx = c.eligible[c.order[(c.start + c.taken) % c.eligible.length]];
         out.push(`${c.cat.id}#${idx}`);
@@ -185,10 +188,10 @@
 
   // ---------- Onboarding : parcours guidé multi-étapes ----------
   const WIZ_STEPS = 4;
-  let wiz = { step: 0, stage: null, checked: {} };
+  let wiz = { step: 0, checked: {}, settings: { ...DEFAULTS } };
 
   function startWizard() {
-    wiz = { step: 0, stage: null, checked: {} };
+    wiz = { step: 0, checked: {}, settings: { ...store.settings } };
     setupMode(true);
     renderWizard();
   }
@@ -232,8 +235,8 @@
     setupEl.appendChild(body);
 
     if (wiz.step === 0) stepWelcome(body);
-    else if (wiz.step === 1) stepStage(body);
-    else if (wiz.step === 2) stepRefine(body);
+    else if (wiz.step === 1) stepInfo(body);
+    else if (wiz.step === 2) stepJalons(body);
     else stepDone(body);
   }
 
@@ -257,33 +260,41 @@
     );
   }
 
-  function stepStage(body) {
-    el("title").textContent = "Où en es-tu ?";
+  function field(labelText, type, key, placeholder) {
+    const wrap = document.createElement("label");
+    wrap.className = "wiz-field";
+    const lab = document.createElement("span");
+    lab.className = "wiz-label";
+    lab.textContent = labelText;
+    const input = document.createElement("input");
+    input.type = type;
+    if (type === "number") {
+      input.inputMode = "numeric";
+      input.min = "1";
+    }
+    input.placeholder = placeholder;
+    input.value = wiz.settings[key] != null ? wiz.settings[key] : "";
+    input.addEventListener("input", () => {
+      wiz.settings[key] = type === "number" ? input.value.replace(/[^0-9]/g, "") : input.value;
+    });
+    wrap.appendChild(lab);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function stepInfo(body) {
+    el("title").textContent = "Tes infos";
     const sub = document.createElement("p");
     sub.className = "wiz-p";
-    sub.textContent = "Choisis l'étape qui correspond le mieux à ta situation actuelle.";
+    sub.textContent = "Remplis ces quelques champs (tu pourras t'en servir comme repères).";
     body.appendChild(sub);
 
-    const wrap = document.createElement("div");
-    wrap.className = "stage-list";
-    for (const ph of PHASES) {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "stage-card" + (wiz.stage === ph.id ? " selected" : "");
-      card.innerHTML =
-        `<span class="stage-emoji">${ph.emoji}</span>` +
-        `<span class="stage-info">` +
-        `<span class="stage-name">Étape ${ph.id} — ${ph.name}</span>` +
-        `<span class="stage-goal">${ph.goal}</span>` +
-        `</span>` +
-        `<span class="stage-check">✓</span>`;
-      card.addEventListener("click", () => {
-        wiz.stage = ph.id;
-        renderWizard();
-      });
-      wrap.appendChild(card);
-    }
-    body.appendChild(wrap);
+    const fields = document.createElement("div");
+    fields.className = "wiz-fields";
+    fields.appendChild(field("Nom de ton SaaS", "text", "name", "Sidian"));
+    fields.appendChild(field("Objectif de revenu mensuel (€)", "number", "goal", "5000"));
+    fields.appendChild(field("Combien de tâches par jour ?", "number", "daily", "8"));
+    body.appendChild(fields);
 
     setupEl.appendChild(
       navButtons({
@@ -291,13 +302,11 @@
           wiz.step = 0;
           renderWizard();
         },
-        nextDisabled: wiz.stage === null,
         next: () => {
-          // Baseline : tout ce qui précède l'étape choisie est considéré comme fait.
-          wiz.checked = {};
-          for (let p = MIN_PHASE; p < wiz.stage; p++) {
-            (msByPhase[p] || []).forEach((m) => (wiz.checked[m.id] = true));
-          }
+          // Nettoyage / valeurs par défaut.
+          wiz.settings.name = (wiz.settings.name || "").trim() || DEFAULTS.name;
+          wiz.settings.goal = Math.max(0, parseInt(wiz.settings.goal, 10) || DEFAULTS.goal);
+          wiz.settings.daily = Math.min(15, Math.max(3, parseInt(wiz.settings.daily, 10) || DEFAULTS.daily));
           wiz.step = 2;
           renderWizard();
         },
@@ -305,37 +314,45 @@
     );
   }
 
-  function stepRefine(body) {
-    const ph = PHASES.find((p) => p.id === wiz.stage);
-    el("title").textContent = `Étape ${ph.id} — ${ph.name}`;
+  function stepJalons(body) {
+    el("title").textContent = "Qu'as-tu déjà fait ?";
     const sub = document.createElement("p");
     sub.className = "wiz-p";
     sub.textContent =
-      "Coche ce que tu as déjà fait à cette étape (laisse vide si tu débutes cette étape).";
+      "Coche tout ce qui est déjà fait. Le reste deviendra automatiquement tes prochaines tâches.";
     body.appendChild(sub);
 
-    const group = document.createElement("div");
-    group.className = "ms-group";
-    for (const m of msByPhase[ph.id] || []) {
-      const row = document.createElement("label");
-      const checked = !!wiz.checked[m.id];
-      row.className = "ms-row" + (checked ? " checked" : "");
-      const box = document.createElement("input");
-      box.type = "checkbox";
-      box.checked = checked;
-      box.addEventListener("change", () => {
-        if (box.checked) wiz.checked[m.id] = true;
-        else delete wiz.checked[m.id];
-        row.classList.toggle("checked", box.checked);
-      });
-      const txt = document.createElement("span");
-      txt.className = "ms-text";
-      txt.textContent = m.t;
-      row.appendChild(box);
-      row.appendChild(txt);
-      group.appendChild(row);
+    for (const ph of PHASES) {
+      const group = document.createElement("div");
+      group.className = "ms-group";
+      const head = document.createElement("div");
+      head.className = "ms-head";
+      head.innerHTML =
+        `<span class="ms-emoji">${ph.emoji}</span>` +
+        `<span class="ms-name">Étape ${ph.id} — ${ph.name}</span>`;
+      group.appendChild(head);
+
+      for (const m of msByPhase[ph.id] || []) {
+        const row = document.createElement("label");
+        const checked = !!wiz.checked[m.id];
+        row.className = "ms-row" + (checked ? " checked" : "");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = checked;
+        box.addEventListener("change", () => {
+          if (box.checked) wiz.checked[m.id] = true;
+          else delete wiz.checked[m.id];
+          row.classList.toggle("checked", box.checked);
+        });
+        const txt = document.createElement("span");
+        txt.className = "ms-text";
+        txt.textContent = m.t;
+        row.appendChild(box);
+        row.appendChild(txt);
+        group.appendChild(row);
+      }
+      body.appendChild(group);
     }
-    body.appendChild(group);
 
     setupEl.appendChild(
       navButtons({
@@ -354,11 +371,14 @@
   function stepDone(body) {
     el("title").textContent = "C'est parti 🚀";
     const ph = PHASES.find((p) => p.id === phaseFrom(wiz.checked));
+    const goalTxt = wiz.settings.goal
+      ? `Objectif : ${Number(wiz.settings.goal).toLocaleString("fr-FR")}€/mois. `
+      : "";
     body.innerHTML =
       `<div class="wiz-hero">` +
       `<div class="wiz-hero-icon">${ph.emoji}</div>` +
-      `<h2 class="wiz-h2">Tu es à l'étape ${ph.id} — ${ph.name}</h2>` +
-      `<p class="wiz-p">Chaque jour, l'app te proposera une courte liste adaptée à cette étape. Quand tu termines un jalon, coche-le dans <b>⚙︎ Mon avancement</b> : ton étape avancera toute seule.</p>` +
+      `<h2 class="wiz-h2">${wiz.settings.name} — étape ${ph.id} : ${ph.name}</h2>` +
+      `<p class="wiz-p">${goalTxt}Chaque jour, ${wiz.settings.daily} tâches adaptées. La liste ne change que lorsque tu as tout coché. Mets à jour ce qui est fait via <b>📋 Mon avancement</b>.</p>` +
       `</div>`;
     setupEl.appendChild(
       navButtons({
@@ -368,7 +388,9 @@
         },
         nextLabel: "Voir mes tâches",
         next: () => {
+          store.settings = { ...wiz.settings };
           store.milestones = { ...wiz.checked };
+          store.batch = null; // forcer une nouvelle liste selon les réglages
           closeSetup();
         },
       })
