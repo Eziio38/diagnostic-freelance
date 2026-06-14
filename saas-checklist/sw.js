@@ -1,7 +1,7 @@
 /* Service worker — stratégie "network-first" pour la coquille de l'app :
    on charge toujours la dernière version quand on est en ligne, et on retombe
    sur le cache hors-ligne. Évite de rester bloqué sur une ancienne version. */
-const CACHE = "saas-daily-v12";
+const CACHE = "saas-daily-v13";
 const SHELL = [
   "./",
   "./index.html",

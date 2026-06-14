@@ -43,7 +43,7 @@ window.PHASES = [
     id: 5,
     name: "Croissance",
     emoji: "📈",
-    goal: "Améliorer et grandir vers 2 000€/mois (~83 clients).",
+    goal: "Améliorer et grandir vers 5 000€/mois.",
     done: "Revenus en hausse régulière vers l'objectif, V2 préparée.",
   },
 ];
@@ -85,7 +85,7 @@ window.MILESTONES = [
   // Étape 5 — Croissance
   { phase: 5, id: "m5a", t: "Tunnel d'inscription analysé et amélioré." },
   { phase: 5, id: "m5b", t: "Un canal pour trouver des clients qui fonctionne." },
-  { phase: 5, id: "m5c", t: "Progression mesurée vers 2 000€/mois." },
+  { phase: 5, id: "m5c", t: "Progression mesurée vers 5 000€/mois." },
 ];
 
 window.CATEGORIES = [
@@ -174,7 +174,7 @@ window.CATEGORIES = [
       { t: "Vérifier que ton message reste clair : « Automatise tes paiements. Réduis tes impayés. »", p: [3, 4, 5] },
       { t: "Revoir les prix (0€ / 29€ / 59€) et le principe : commission seulement si l'argent est récupéré.", p: [4, 5] },
       { t: "Vérifier que même les petits montants restent rentables (frais de carte/virement couverts).", p: [4, 5] },
-      { t: "Garder en tête l'objectif : environ 83 clients pour 2 000€ net par mois.", p: [4, 5] },
+      { t: "Garder en tête l'objectif : 5 000€ net par mois.", p: [4, 5] },
       { t: "Vérifier que tu restes en règle avec la nouvelle loi sur la facture électronique (2026 / 2027).", p: [4, 5] },
       { t: "Décider quand lancer la V2 (lecture de factures, virement) selon la vraie demande des clients.", p: [5] },
       { t: "Choisir UNE chose à NE PAS faire cette semaine pour rester concentré.", p: ALL },
@@ -240,7 +240,7 @@ window.CATEGORIES = [
       { t: "Relancer les freelances inscrits qui n'ont pas connecté Stripe.", p: [4, 5] },
       { t: "Relancer les contrats où le client n'a pas encore enregistré sa carte.", p: [4, 5] },
       { t: "Mesurer le pourcentage de prélèvements réussis (objectif ~95%).", p: [4, 5] },
-      { t: "Suivre ta progression vers 2 000€ par mois (abonnements + commissions).", p: [4, 5] },
+      { t: "Suivre ta progression vers 5 000€ par mois (abonnements + commissions).", p: [4, 5] },
       { t: "Choisir un canal pour trouver des freelances et y mettre plus d'efforts cette semaine.", p: [4, 5] },
       { t: "Chercher un partenaire (groupes de freelances, comptables, outils de facture).", p: [4, 5] },
       { t: "Tester une nouvelle façon d'attirer des clients, à petit budget, et noter le résultat.", p: [5] },
