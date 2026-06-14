@@ -1,13 +1,15 @@
 :root {
-  --bg: #f7f8fa;
-  --card: #ffffff;
-  --text: #1b1f27;
-  --muted: #8a93a3;
-  --line: #ececf1;
-  --line-soft: #f2f3f6;
-  --accent: #4f6bff;
-  --done: #18a558;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --bg: #ffffff;
+  --text: #37352f;             /* couleur de texte signature Notion */
+  --muted: rgba(55, 53, 47, 0.5);
+  --muted-strong: rgba(55, 53, 47, 0.65);
+  --hover: rgba(55, 53, 47, 0.06);
+  --line: rgba(55, 53, 47, 0.09);
+  --callout-bg: #f7f6f3;
+  --accent: #2383e2;           /* bleu Notion */
+  --done: #2383e2;
+  --gold-bg: #fbf3db;          /* callout jaune Notion */
+  --gold-text: #a3791e;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -16,175 +18,180 @@ html, body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Helvetica,
+    "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji";
   -webkit-font-smoothing: antialiased;
+  font-size: 16px;
 }
 
 .app {
-  max-width: 600px;
+  max-width: 680px;
   margin: 0 auto;
-  padding: env(safe-area-inset-top) 18px calc(env(safe-area-inset-bottom) + 24px);
+  padding: env(safe-area-inset-top) 20px calc(env(safe-area-inset-bottom) + 32px);
   min-height: 100vh;
 }
 
-/* ---------- Header ---------- */
-.top {
+/* ---------- Page header (titre type page Notion) ---------- */
+.page-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 0 14px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 28px 0 16px;
 }
-.brand { display: flex; align-items: center; gap: 11px; }
-.logo {
-  width: 38px; height: 38px; border-radius: 11px;
-  display: grid; place-items: center;
-  background: var(--accent); color: #fff; font-size: 19px; font-weight: 800;
+.page-icon { font-size: 38px; line-height: 1; flex: 0 0 auto; }
+.page-titles { flex: 1; min-width: 0; }
+.title-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.title-line h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
-.top h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
-.tagline { margin: 1px 0 0; font-size: 12px; color: var(--muted); }
+.tagline { margin: 4px 0 0; font-size: 14px; color: var(--muted-strong); }
 
 .streak {
-  display: flex; align-items: center; gap: 4px;
-  color: var(--text); font-weight: 700; font-size: 15px;
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--muted-strong); font-weight: 600; font-size: 14px;
+  background: var(--hover); padding: 4px 10px; border-radius: 6px; flex: 0 0 auto;
 }
-.flame { font-size: 15px; }
+.flame { font-size: 14px; }
 
-/* ---------- Phase bar (épuré) ---------- */
-.phasebar {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 14px;
-  box-shadow: var(--shadow);
+/* ---------- Callout (palier) ---------- */
+.callout {
+  display: flex;
+  gap: 10px;
+  background: var(--callout-bg);
+  border-radius: 6px;
+  padding: 16px;
+  margin: 6px 0 22px;
 }
+.callout-emoji { font-size: 20px; line-height: 1.4; flex: 0 0 auto; }
+.callout-body { flex: 1; min-width: 0; }
 .phase-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.phase-badge { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-.phase-pct { font-size: 13px; font-weight: 700; color: var(--accent); flex: 0 0 auto; }
+.phase-badge { font-size: 15px; font-weight: 600; color: var(--text); }
+.phase-pct { font-size: 13px; font-weight: 600; color: var(--accent); flex: 0 0 auto; }
 .phase-mini-track {
-  height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 9px 0 0;
+  height: 6px; background: rgba(55, 53, 47, 0.12); border-radius: 999px;
+  overflow: hidden; margin: 10px 0 0;
 }
 .phase-mini-fill {
   height: 100%; width: 0%; background: var(--accent); border-radius: 999px;
   transition: width 0.35s ease;
 }
-.phase-goal { margin: 11px 0 0; font-size: 14px; line-height: 1.45; color: var(--text); }
-.phase-next { margin: 5px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.phase-goal { margin: 11px 0 0; font-size: 14px; line-height: 1.5; color: var(--text); }
+.phase-next { margin: 6px 0 0; font-size: 13px; color: var(--muted-strong); line-height: 1.4; }
 
 /* ---------- Date bar ---------- */
 .datebar {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin: 0 0 16px;
+  gap: 10px; margin: 0 0 14px;
 }
 .nav {
-  width: 38px; height: 38px; border-radius: 10px;
-  background: var(--card); color: var(--text);
-  border: 1px solid var(--line); font-size: 20px; line-height: 1;
-  cursor: pointer;
+  width: 32px; height: 32px; border-radius: 6px;
+  background: transparent; color: var(--muted-strong);
+  border: 0; font-size: 20px; line-height: 1; cursor: pointer;
 }
-.nav:disabled { opacity: 0.35; cursor: default; }
+.nav:hover { background: var(--hover); }
+.nav:disabled { opacity: 0.3; cursor: default; background: transparent; }
 .dateinfo { text-align: center; flex: 1; }
 .today-btn {
   background: transparent; border: 0; color: var(--accent);
-  font-size: 11px; font-weight: 700; cursor: pointer; padding: 0;
-  text-transform: uppercase; letter-spacing: 0.07em;
+  font-size: 12px; font-weight: 600; cursor: pointer; padding: 0;
 }
-.date-label { font-size: 15px; font-weight: 600; margin-top: 2px; }
+.date-label { font-size: 14px; font-weight: 600; margin-top: 1px; color: var(--text); }
 
-/* ---------- Progress (léger) ---------- */
-.progress-wrap { margin-bottom: 20px; }
+/* ---------- Daily progress ---------- */
+.progress-wrap { margin-bottom: 8px; }
 .progress-track {
-  height: 8px; background: var(--line); border-radius: 999px; overflow: hidden;
+  height: 4px; background: var(--line); border-radius: 999px; overflow: hidden;
 }
 .progress-fill {
-  height: 100%; width: 0%;
-  background: var(--accent);
+  height: 100%; width: 0%; background: var(--accent);
   border-radius: 999px; transition: width 0.35s ease;
 }
-.progress-text { font-size: 12px; color: var(--muted); margin-top: 7px; text-align: right; }
+.progress-text { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: right; }
 
-/* ---------- Categories ---------- */
-.cat {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 6px 16px;
-  margin-bottom: 12px;
-  box-shadow: var(--shadow);
-}
-.cat-head { display: flex; align-items: center; gap: 9px; padding: 13px 0 4px; }
-.cat-dot {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--cat, var(--accent)); flex: 0 0 auto;
-}
-.cat-emoji { font-size: 15px; }
+/* ---------- Catégories (sections type Notion, sans carte) ---------- */
+.list { margin-top: 12px; }
+.cat { margin-bottom: 22px; }
+.cat-head { display: flex; align-items: center; gap: 7px; padding: 2px 6px 4px; }
+.cat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cat, var(--accent)); flex: 0 0 auto; }
+.cat-emoji { font-size: 14px; }
 .cat-head h2 {
-  margin: 0; font-size: 12px; font-weight: 700; color: var(--muted);
+  margin: 0; font-size: 12px; font-weight: 600; color: var(--muted-strong);
   text-transform: uppercase; letter-spacing: 0.05em;
 }
 
-.cat.horizon { background: #fbfaf4; border-color: #efe7c8; }
-.cat.horizon .cat-head h2 { color: #a98a1f; text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.cat.horizon { background: var(--gold-bg); border-radius: 6px; padding: 12px 10px 6px; }
+.cat.horizon .cat-head { padding-top: 0; }
+.cat.horizon .cat-head h2 {
+  color: var(--gold-text); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600;
+}
 
+/* ---------- To-do items (style Notion) ---------- */
 .items { display: flex; flex-direction: column; }
 .item {
-  display: flex; align-items: flex-start; gap: 13px;
-  padding: 13px 2px; border-top: 1px solid var(--line-soft);
-  cursor: pointer;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 7px 6px; border-radius: 4px; cursor: pointer;
+  transition: background 0.08s;
 }
-.item:first-child { border-top: 0; }
+.item:hover { background: var(--hover); }
 .item input[type="checkbox"] {
   appearance: none; -webkit-appearance: none;
-  width: 21px; height: 21px; margin: 1px 0 0; flex: 0 0 auto;
-  border: 2px solid #d3d8e0; border-radius: 7px;
-  background: #fff; cursor: pointer; position: relative;
-  transition: background 0.15s, border-color 0.15s;
+  width: 16px; height: 16px; margin: 3px 0 0; flex: 0 0 auto;
+  border: 1.5px solid rgba(55, 53, 47, 0.4); border-radius: 3px;
+  background: transparent; cursor: pointer; position: relative;
+  transition: background 0.12s, border-color 0.12s;
 }
 .item input[type="checkbox"]:checked {
   background: var(--done); border-color: var(--done);
 }
 .item input[type="checkbox"]:checked::after {
-  content: "✓"; position: absolute; inset: 0;
-  display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800;
+  content: "✓"; position: absolute; inset: -1px 0 0 0;
+  display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 800;
 }
-.item-text { font-size: 15px; line-height: 1.45; flex: 1; color: var(--text); }
+.item-text { font-size: 15px; line-height: 1.5; flex: 1; color: var(--text); }
 .item.checked .item-text { color: var(--muted); text-decoration: line-through; }
 
 .del {
-  background: transparent; border: 0; color: #c2c8d2;
-  font-size: 14px; cursor: pointer; padding: 2px 6px; flex: 0 0 auto;
+  background: transparent; border: 0; color: rgba(55, 53, 47, 0.3);
+  font-size: 13px; cursor: pointer; padding: 2px 6px; flex: 0 0 auto;
+  opacity: 0; transition: opacity 0.1s;
 }
-.del:hover { color: #ef4444; }
+.item:hover .del { opacity: 1; }
+.del:hover { color: #eb5757; }
 
-/* ---------- Add custom ---------- */
-.add-custom { margin: 4px 0 20px; }
-#customForm { display: flex; gap: 8px; }
+/* ---------- Add custom (ligne "+ New" type Notion) ---------- */
+.add-custom { margin: 8px 0 18px; }
+#customForm { display: flex; gap: 8px; align-items: center; }
 #customCat {
-  background: var(--card); color: var(--text);
-  border: 1px solid var(--line); border-radius: 11px;
-  padding: 0 8px; font-size: 13px; max-width: 128px;
+  background: transparent; color: var(--muted-strong);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 7px 8px; font-size: 13px; max-width: 130px;
   appearance: none; -webkit-appearance: none;
 }
 #customInput {
-  flex: 1; background: var(--card); color: var(--text);
-  border: 1px solid var(--line); border-radius: 11px;
-  padding: 12px 14px; font-size: 14px;
+  flex: 1; background: transparent; color: var(--text);
+  border: 0; border-bottom: 1px solid var(--line);
+  padding: 8px 4px; font-size: 14px; border-radius: 0;
 }
 #customInput::placeholder { color: var(--muted); }
 #customInput:focus, #customCat:focus { outline: none; border-color: var(--accent); }
 #customForm button {
-  width: 46px; border: 0; border-radius: 11px;
-  background: var(--accent); color: #fff; font-size: 22px; cursor: pointer;
+  width: 32px; height: 32px; border: 0; border-radius: 6px;
+  background: var(--accent); color: #fff; font-size: 20px; cursor: pointer;
+  display: grid; place-items: center;
 }
 
 /* ---------- Footer ---------- */
-.foot { text-align: center; padding: 4px 0 8px; }
+.foot { text-align: center; padding: 8px 0; }
 .ghost {
-  background: var(--card); color: var(--text);
-  border: 1px solid var(--line); border-radius: 11px;
-  padding: 11px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
-  box-shadow: var(--shadow);
+  background: transparent; color: var(--muted-strong);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 9px 16px; font-size: 14px; font-weight: 500; cursor: pointer;
 }
+.ghost:hover { background: var(--hover); }
 .hint { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
 
 /* ---------- Toast ---------- */
@@ -192,9 +199,9 @@ html, body {
   position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px);
   translate: -50% 20px;
   background: var(--text); color: #fff;
-  border-radius: 999px;
-  padding: 12px 18px; font-size: 13.5px; font-weight: 600;
-  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.25);
+  border-radius: 8px;
+  padding: 11px 18px; font-size: 13.5px; font-weight: 500;
+  box-shadow: 0 8px 24px rgba(15, 15, 15, 0.2);
   opacity: 0; pointer-events: none; transition: opacity 0.25s, translate 0.25s;
   max-width: 90vw; text-align: center;
 }
