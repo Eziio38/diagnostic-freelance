@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>EXCOMMUNICADO — Gun-fu tactique</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Jeu d'action top-down réaliste inspiré de John Wick : chargeurs individuels, tirs à la tête létaux, protection balistique, désarmements, projections et exécutions.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%23111%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27none%27 stroke=%27%23d32f2f%27 stroke-width=%273%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%273%27 fill=%27%23fff%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui">
+  <!-- Menu principal -->
+  <section id="menu" class="screen">
+    <h1>EXCOMMUNICADO</h1>
+    <p class="tag">Gun-fu tactique · un jeu en local inspiré de John Wick</p>
+    <div class="buttons">
+      <button data-action="start" class="primary">Nouvelle partie</button>
+      <button data-action="levels">Choisir un niveau</button>
+      <button data-action="controls">Commandes</button>
+      <button data-action="options">Options</button>
+    </div>
+    <p class="hint">Chargeurs individuels · cartouche chambrée +1 · culasse ouverte · costume balistique · casques et plaques · désarmement · projections · exécutions · portes et vitres traversables par les balles</p>
+  </section>
+
+  <!-- Choix du niveau -->
+  <section id="levels" class="screen hidden">
+    <h2>Niveaux</h2>
+    <div id="level-list" class="level-list"></div>
+    <div class="buttons"><button data-action="back">Retour</button></div>
+  </section>
+
+  <!-- Commandes -->
+  <section id="controls" class="screen hidden">
+    <h2>Commandes</h2>
+    <div class="controls-grid">
+      <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Se déplacer (AZERTY et QWERTY détectés automatiquement)</div>
+      <div><kbd>Souris</kbd></div><div>Viser — le personnage regarde toujours le curseur</div>
+      <div><kbd>Clic gauche</kbd></div><div>Tirer (semi-auto : un clic = un tir · auto : maintenir) · Couteau : frapper</div>
+      <div><kbd>Clic droit</kbd> (maintenu)</div><div>Visée précise : dispersion réduite, déplacement ralenti</div>
+      <div><kbd>R</kbd></div><div>Recharger. Chargeur partiel conservé (+1 chambrée). Arme vide = culasse ouverte, plus long. Fusil : cartouche par cartouche, interruptible</div>
+      <div><kbd>F</kbd></div><div>Mêlée gun-fu : 1<sup>re</sup> frappe étourdit · 2<sup>e</sup> frappe <b>désarme</b> (vous récupérez l'arme) · 3<sup>e</sup> = <b>projection</b> au sol · <kbd>F</kbd> sur un ennemi à terre = <b>exécution</b></div>
+      <div><kbd>Espace</kbd></div><div>Esquive (dans la direction du déplacement) — pas d'invulnérabilité, mais les tireurs ratent une cible rapide</div>
+      <div><kbd>Maj</kbd></div><div>Courir (endurance, bruit de pas, imprécision)</div>
+      <div><kbd>E</kbd></div><div>Ramasser une arme / des munitions / un kit / une plaque</div>
+      <div><kbd>G</kbd></div><div>Lancer l'arme en main (étourdit, se ramasse ensuite)</div>
+      <div><kbd>H</kbd></div><div>Kit de soins (3 s, interrompu si vous êtes touché)</div>
+      <div><kbd>B</kbd></div><div>Mode de tir (auto / semi) sur les armes automatiques</div>
+      <div><kbd>1</kbd>–<kbd>4</kbd> / <kbd>Molette</kbd> / <kbd>Tab</kbd></div><div>Changer d'arme (plus rapide que recharger)</div>
+      <div><kbd>Échap</kbd> / <kbd>P</kbd></div><div>Pause</div>
+    </div>
+    <h3>Réalisme</h3>
+    <ul class="rules">
+      <li><b>Zones d'impact</b> : tête (létal), torse (3 balles de 9 mm sans protection), membres (ralentissement). Plus votre tir est centré, plus il touche haut.</li>
+      <li><b>Protections</b> : votre costume balistique absorbe l'essentiel des tirs au torse mais s'use. Les mercenaires blindés ont des plaques (le 9 mm ne passe pas) et un casque (un premier tir à la tête le brise). La carabine 5,56 traverse plaques légères, caisses et corps.</li>
+      <li><b>Munitions</b> : pas de réserve magique. Chaque chargeur a son compte. Les armes des morts se ramassent avec ce qu'il leur reste.</li>
+      <li><b>IA</b> : temps de réaction, rafales, repli à couvert pour recharger, flanquement, alerte des alliés au bruit, fouille de la dernière position connue.</li>
+      <li><b>Balistique</b> : portes en bois et vitres traversées (dégâts réduits), murs et piliers opaques, caisses arrêtent le pistolet.</li>
+    </ul>
+    <div class="buttons"><button data-action="back">Retour</button></div>
+  </section>
+
+  <!-- Options -->
+  <section id="options" class="screen hidden">
+    <h2>Options</h2>
+    <div class="options">
+      <label>Difficulté <select id="difficulty"></select></label>
+      <p id="difficulty-desc" class="desc"></p>
+      <label>Volume <input type="range" id="volume" min="0" max="1" step="0.05"></label>
+      <label><input type="checkbox" id="music"> Musique d'ambiance</label>
+      <label><input type="checkbox" id="crosshair"> Réticule dynamique</label>
+      <button id="reset-progress" class="small">Effacer la progression</button>
+    </div>
+    <div class="buttons"><button data-action="back">Retour</button></div>
+  </section>
+
+  <!-- Briefing -->
+  <section id="briefing" class="screen hidden">
+    <p class="sub" id="brief-sub"></p>
+    <h2 id="brief-title"></h2>
+    <p class="brief" id="brief-text"></p>
+    <p class="objective"><b>Objectif :</b> <span id="brief-obj"></span></p>
+    <p class="loadout" id="brief-loadout"></p>
+    <div class="buttons"><button data-action="begin" class="primary">Commencer (Entrée)</button><button data-action="menu">Menu</button></div>
+  </section>
+
+  <!-- Pause -->
+  <section id="pause" class="screen hidden">
+    <h2>Pause</h2>
+    <div class="buttons">
+      <button data-action="resume" class="primary">Reprendre (Échap)</button>
+      <button data-action="restart">Recommencer le niveau</button>
+      <button data-action="controls">Commandes</button>
+      <button data-action="menu">Menu principal</button>
+    </div>
+  </section>
+
+  <!-- Mort -->
+  <section id="dead" class="screen hidden">
+    <h2 class="red">Excommunicado</h2>
+    <p class="sub">Le contrat a été honoré.</p>
+    <div class="stats" id="dead-stats"></div>
+    <div class="buttons"><button data-action="retry" class="primary">Réessayer (Entrée)</button><button data-action="menu">Menu</button></div>
+  </section>
+
+  <!-- Niveau terminé -->
+  <section id="complete" class="screen hidden">
+    <h2 id="complete-title"></h2>
+    <div class="stats" id="complete-stats"></div>
+    <div class="buttons"><button data-action="next" class="primary" id="next-btn">Niveau suivant</button><button data-action="menu">Menu</button></div>
+  </section>
+</div>
+<script src="js/util.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/render.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
