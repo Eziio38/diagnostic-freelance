@@ -251,6 +251,7 @@ class Player extends Character {
     this.armor = { hp: 160, max: 160, reduce: { pistol: 0.7, rifle: 0.4, shotgun: 0.55, melee: 0.35 } };
     this.current = 0; this.swapT = 0; this.wantFire = false; this.fireHeld = false; this.mouseAngle = 0;
     this.footT = 0; this.lastShotT = -9;
+    this.velX = 0; this.velY = 0; this.stickAngle = null;
   }
   setWeapons(list) { this.weapons = list; this.current = Math.min(1, list.length - 1); this.weapon = list[this.current]; }
   selectWeapon(i, game) {
@@ -266,73 +267,101 @@ class Player extends Character {
     s += w.recoil;
     if (this.moving > 0.1) s += w.def.moveSpread * (this.sprinting ? 2.5 : 1) * this.moving;
     if (this.dodgeT > 0) s += 6;
+    if (this.stamina < 25) s += (25 - this.stamina) / 25 * 2.5; // essoufflé : la main tremble
     return s;
   }
   update(dt, game, input) {
     this.baseUpdate(dt);
     if (this.dead) return;
     const w = this.weapon;
-    if (w) { const done = weaponUpdate(w, dt); if (done && w.def.type === 'shotgun') game.audio.reload('shell', 0); }
+    if (w) { const done = weaponUpdate(w, dt); if (done) { if (w.def.type === 'shotgun') game.audio.reload('shell', 0); input.rumble(0.12, 0.3, 40); } }
     if (this.swapT > 0) this.swapT -= dt;
     if (this.meleeT > 0) this.meleeT -= dt;
     if (this.dodgeCd > 0) this.dodgeCd -= dt;
     if (this.staminaDelay > 0) this.staminaDelay -= dt; else this.stamina = Math.min(100, this.stamina + 22 * dt);
-    // Visée
-    const m = game.mouseWorld();
-    this.mouseAngle = angleTo(this.x, this.y, m.x, m.y);
-    if (this.executing <= 0) this.angle = this.mouseAngle;
-    this.aiming = input.mouse.rdown && this.hasFirearm && this.dodgeT <= 0;
+    const gpMode = input.usingGamepad && input.gp.connected;
+    this.aiming = input.aimDown() && this.hasFirearm && this.dodgeT <= 0;
+    // --- Intention de déplacement : clavier (tout ou rien) ou stick gauche (analogique)
+    let mx = 0, my = 0;
+    if (input.down('forward')) my -= 1; if (input.down('back')) my += 1;
+    if (input.down('left')) mx -= 1; if (input.down('right')) mx += 1;
+    let mag = (mx || my) ? 1 : 0;
+    if (!mag && input.gp.connected && input.gp.lmag > 0) { mx = input.gp.lx; my = input.gp.ly; mag = input.gp.lmag; }
+    const len = Math.hypot(mx, my); if (len > 0) { mx /= len; my /= len; }
+    // --- Visée : souris (instantanée) ou stick droit (rotation du corps limitée, aide à la visée)
+    if (gpMode) {
+      if (input.gp.rmag > 0.05) this.stickAngle = Math.atan2(input.gp.ry, input.gp.rx);
+      else if (this.stickAngle == null) this.stickAngle = this.angle;
+      let target = this.stickAngle;
+      if (input.gp.rmag > 0.05) { if (game.settings.aimAssist) target = this.aimAssist(game, target); }
+      else if (mag > 0 && !input.fireDown() && !this.aiming) { target = Math.atan2(my, mx); this.stickAngle = target; }
+      if (this.executing <= 0) { const d = angleDiff(this.angle, target); const maxTurn = 15 * dt; this.angle += clamp(d, -maxTurn, maxTurn); }
+      this.mouseAngle = this.angle;
+      const reach = (3 + 3.5 * input.gp.rmag) * TILE;
+      game.aimPoint.x = this.x + Math.cos(this.angle) * reach; game.aimPoint.y = this.y + Math.sin(this.angle) * reach;
+    } else {
+      const m = game.mouseWorld();
+      this.mouseAngle = angleTo(this.x, this.y, m.x, m.y);
+      if (this.executing <= 0) this.angle = this.mouseAngle;
+    }
     // Exécution en cours
     if (this.executing > 0) {
       this.executing -= dt;
       if (this.execTarget && !this.execTarget.dead) this.angle = angleTo(this.x, this.y, this.execTarget.x, this.execTarget.y);
       if (this.executing <= 0) this.finishExecution(game);
-      this.moving = 0; return;
+      this.moving = 0; this.velX = this.velY = 0; this.vx = this.vy = 0; return;
     }
     // Soins
     if (this.healing > 0) {
       this.healing -= dt;
       if (this.healing <= 0) { this.medkits--; this.hp = Math.min(this.maxHp, this.hp + 50); game.msg('Soins appliqués'); game.audio.pickup(); }
     }
-    // Déplacement
-    let mx = 0, my = 0;
-    if (input.down('forward')) my -= 1; if (input.down('back')) my += 1;
-    if (input.down('left')) mx -= 1; if (input.down('right')) mx += 1;
-    const len = Math.hypot(mx, my); if (len > 0) { mx /= len; my /= len; }
-    this.sprinting = input.down('sprint') && len > 0 && this.stamina > 0 && !this.aiming && this.healing <= 0 && !(w && w.reloading && w.def.type !== 'shotgun');
-    let speed = this.speed;
+    this.sprinting = input.down('sprint') && mag > 0 && this.stamina > 0 && !this.aiming && this.healing <= 0 && !(w && w.reloading && w.def.type !== 'shotgun');
+    let speed = this.speed * (mag < 1 ? lerp(0.3, 1, mag) : 1);
     if (this.sprinting) { speed *= 2.0; this.stamina -= 18 * dt; this.staminaDelay = 0.7; if (this.stamina < 0) this.stamina = 0; }
     if (this.aiming) speed *= w.def.aimSpeed;
+    if (w && w.def.weight) speed *= w.def.weight;
     if (this.healing > 0) speed *= 0.4;
     if (this.slowT > 0) speed *= 0.6;
     if (this.stagger > 0) speed *= 0.3;
     // Esquive
     if (input.pressed('dodge') && this.dodgeT <= 0 && this.dodgeCd <= 0 && this.stamina >= 20 && this.stagger <= 0) {
       this.dodgeT = 0.34; this.dodgeCd = 0.6; this.stamina -= 20; this.staminaDelay = 0.8; this.healing = 0;
-      this.dodgeDir = len > 0 ? Math.atan2(my, mx) : this.angle + Math.PI;
+      this.dodgeDir = mag > 0 ? Math.atan2(my, mx) : this.angle + Math.PI;
       if (w) weaponCancelReload(w);
-      game.audio.swish();
+      game.audio.swish(); input.rumble(0.2, 0.4, 60);
     }
     let dx, dy;
     if (this.dodgeT > 0) {
       this.dodgeT -= dt;
       const sp = 330 * (0.5 + this.dodgeT / 0.34);
-      dx = Math.cos(this.dodgeDir) * sp * dt; dy = Math.sin(this.dodgeDir) * sp * dt;
+      this.velX = Math.cos(this.dodgeDir) * sp; this.velY = Math.sin(this.dodgeDir) * sp;
+      dx = this.velX * dt; dy = this.velY * dt;
       this.moving = 1;
     } else {
-      dx = mx * speed * dt; dy = my * speed * dt;
-      this.moving = len > 0 ? clamp(speed / this.speed, 0.4, 1.6) : 0;
+      // Inertie : on accélère vers la vitesse voulue, on freine plus vite qu'on n'accélère
+      const tx = mx * speed, ty = my * speed;
+      const accel = (mag > 0 ? 1100 : 1800) * dt;
+      const ddx = tx - this.velX, ddy = ty - this.velY; const dl = Math.hypot(ddx, ddy);
+      if (dl <= accel) { this.velX = tx; this.velY = ty; } else { this.velX += ddx / dl * accel; this.velY += ddy / dl * accel; }
+      dx = this.velX * dt; dy = this.velY * dt;
+      const sp = Math.hypot(this.velX, this.velY);
+      this.moving = sp > 4 ? clamp(sp / this.speed, 0.3, 1.6) : 0;
     }
     if (dx || dy) {
+      const x0 = this.x, y0 = this.y;
       game.world.moveCircle(this, dx, dy);
-      this.stepDist += Math.hypot(dx, dy);
+      // la vitesse réelle tient compte des murs (on ne "pousse" pas contre un mur)
+      this.velX = (this.x - x0) / dt; this.velY = (this.y - y0) / dt;
+      this.stepDist += Math.hypot(this.x - x0, this.y - y0);
       const stepLen = this.sprinting ? 34 : 26;
-      if (this.stepDist > stepLen) { this.stepDist = 0; game.audio.footstep(this.sprinting ? 0.11 : 0.06); if (this.sprinting) game.noise(this.x, this.y, 5 * TILE, this); }
+      if (this.stepDist > stepLen) { this.stepDist = 0; game.audio.footstep(this.sprinting ? 0.11 : 0.04 + 0.03 * this.moving); if (this.sprinting) game.noise(this.x, this.y, 5 * TILE, this); }
     }
-    this.vx = dx / dt; this.vy = dy / dt;
+    this.vx = this.velX; this.vy = this.velY;
     // Armes
     if (input.mouse.wheel !== 0) this.selectWeapon((this.current + (input.mouse.wheel > 0 ? 1 : -1) + this.weapons.length) % this.weapons.length, game);
     if (input.pressed('next')) this.selectWeapon((this.current + 1) % this.weapons.length, game);
+    if (input.pressed('prev')) this.selectWeapon((this.current - 1 + this.weapons.length) % this.weapons.length, game);
     for (let i = 0; i < 4; i++) if (input.pressed('slot' + (i + 1))) this.selectWeapon(i, game);
     if (input.pressed('reload') && w && this.dodgeT <= 0) this.reload(game);
     if (input.pressed('mode') && w && w.def.modes) { const md = weaponToggleMode(w); game.msg('Mode : ' + (md === 'auto' ? 'automatique' : 'semi-automatique')); game.audio.click(0, 0, 0.2, 1500); }
@@ -342,10 +371,23 @@ class Player extends Character {
     if (input.pressed('interact')) game.interact();
     // Tir
     const canShoot = w && w.def.type !== 'melee' && this.swapT <= 0 && this.dodgeT <= 0 && this.meleeT <= 0 && this.healing <= 0 && this.stagger <= 0;
-    const trigger = w && (w.def.auto && w.mode !== 'semi') ? input.mouse.down : input.mouse.justDown;
-    if (w && w.def.type === 'melee') { if (input.mouse.justDown) this.melee(game); }
+    const auto = w && w.def.auto && w.mode !== 'semi';
+    const trigger = auto ? input.fireDown() : input.fireJust();
+    if (w && w.def.type === 'melee') { if (input.fireJust()) this.melee(game); }
     else if (trigger && canShoot) this.tryFire(game);
-    this.fireHeld = input.mouse.down;
+    this.fireHeld = input.fireDown();
+  }
+  // Aide à la visée (manette) : légère attraction vers l'ennemi visible le plus proche de l'axe
+  aimAssist(game, angle) {
+    let bestDiff = null, bestAbs = rad(9);
+    for (const e of game.enemies) {
+      if (e.dead || !e.visible || e.downed > 0) continue;
+      const d = dist(this.x, this.y, e.x, e.y); if (d > 13 * TILE || d < 20) continue;
+      const diff = angleDiff(angle, angleTo(this.x, this.y, e.x, e.y));
+      const tol = Math.min(rad(9), Math.atan2(e.r * 2.4, d));
+      if (Math.abs(diff) < tol && Math.abs(diff) < bestAbs) { bestAbs = Math.abs(diff); bestDiff = diff; }
+    }
+    return bestDiff != null ? angle + bestDiff * 0.6 : angle;
   }
   reload(game) {
     const w = this.weapon; if (!w || w.def.type === 'melee') return;
@@ -424,13 +466,13 @@ class Player extends Character {
       return;
     }
     if (isKnife) {
-      game.stats.meleeHits++;
+      game.stats.meleeHits++; game.input.rumble(0.4, 0.2, 60);
       applyHit(game, target, w.def.dmg, 'torso', { cls: 'melee', shooter: this, dir });
       if (!target.dead) target.stagger = Math.max(target.stagger, 0.35);
       game.audio.meleeHit(game.panOf(target.x), false);
       return;
     }
-    game.stats.meleeHits++;
+    game.stats.meleeHits++; game.input.rumble(0.45, 0.25, 70);
     this.combo = (game.time - this.comboT < 1.4) ? this.combo + 1 : 1; this.comboT = game.time;
     if (this.combo === 1) {
       applyHit(game, target, { head: 12, torso: 10, limb: 6 }, 'torso', { cls: 'melee', shooter: this, dir });
@@ -449,7 +491,7 @@ class Player extends Character {
         const nx = target.x + Math.cos(dir) * 26, ny = target.y + Math.sin(dir) * 26;
         if (!game.world.raycast(target.x, target.y, nx, ny, (tx, ty) => game.world.isSolid(tx, ty)).hit) { target.x = nx; target.y = ny; }
         target.angle = dir + HALF_PI;
-        game.msg('Projection !'); game.audio.bodyFall(game.panOf(target.x)); game.shake(4);
+        game.msg('Projection !'); game.audio.bodyFall(game.panOf(target.x)); game.shake(4); game.input.rumble(0.7, 0.3, 120);
         game.stats.throws++;
       }
       this.combo = 0;

@@ -13,6 +13,26 @@ Jeu d'action vue du dessus, **100 % local** (HTML5 / Canvas / Web Audio, aucune 
 
 Le son est synthétisé en temps réel (Web Audio) et démarre au premier clic.
 
+## Manette PS5 (DualSense)
+
+Branchez la manette en USB ou Bluetooth, appuyez sur un bouton : elle est détectée par l'API Gamepad du navigateur (Chrome, Edge, Firefox, mapping « standard », donc aussi DualShock 4 et manettes Xbox). Les menus se pilotent au D-pad ou au stick, `✕` valide, `○` revient. Vibrations à chaque tir, impact, esquive et projection.
+
+| Manette | Action |
+|---|---|
+| Stick gauche | Se déplacer, vitesse analogique (marche lente et silencieuse jusqu'au pas rapide) |
+| Stick droit | Viser : le corps pivote avec une vitesse de rotation limitée ; légère aide à la visée (désactivable) |
+| `R2` | Tirer (gâchette analogique ; en semi-auto, chaque pression = un tir) |
+| `L2` (maintenu) | Visée précise |
+| `R1` | Mêlée : frappe → désarmement → projection ; exécution sur un ennemi à terre |
+| `✕` | Esquive |
+| `□` | Recharger |
+| `△` | Ramasser / interagir |
+| `L1` | Lancer l'arme |
+| `L3` | Courir |
+| D-pad `↑` / `↓` | Kit de soins / mode de tir |
+| D-pad `←` / `→` | Arme précédente / suivante |
+| `Options` | Pause |
+
 ## Commandes
 
 | Touche | Action |
@@ -41,6 +61,7 @@ Le son est synthétisé en temps réel (Web Audio) et démarre au premier clic.
 - **Armes** : P-30L et G-34 (9 mm), 1911 (.45), G-19 (ennemis), MP-9 (PM 9 mm), TR-1 (carabine 5,56, auto/semi), M-4 tactique (calibre 12, 7+1, 8 plombs), couteau.
 - **IA** : temps de réaction selon la compétence, rafales puis pause, repli à couvert pour recharger avec « peek », flanquement, alerte des alliés à la vue et au bruit (rayon réduit derrière les murs), fouille de la dernière position connue, désarmés qui vont chercher une arme au sol ou chargent au corps à corps, spécialistes au couteau en zigzag.
 - **Vision** : brouillard de vision par lancer de rayons (on ne voit que ce qui est en ligne de vue), éclairage par sources, flashs de bouche qui éclairent.
+- **Corps** : inertie au démarrage et au freinage, rotation du buste limitée à la manette, armes lourdes qui ralentissent, main qui tremble quand vous êtes essoufflé.
 - **Trois difficultés** : Cinéma, Réaliste (défaut), Baba Yaga.
 
 ## Niveaux
@@ -61,7 +82,7 @@ excommunicado/
 └── js/
     ├── util.js       maths, tas binaire, stockage
     ├── audio.js      synthèse des sons et musiques (Web Audio)
-    ├── input.js      clavier (event.code) + souris
+    ├── input.js      clavier (event.code), souris, manette (API Gamepad, vibrations)
     ├── weapons.js    armes, munitions, chargeurs, rechargements
     ├── maps.js       niveaux en ASCII
     ├── world.js      grille, collisions, rayons, A*, portes, vitres, décals

@@ -29,13 +29,13 @@ const WEAPONS = {
            reloadTac: 1.5, reloadEmpty: 2.0, swap: 0.45, noise: 19, twoHanded: false, aimSpeed: 0.62, len: 14 },
   mp9:   { id: 'mp9', name: 'MP-9 9mm', short: 'MP9', type: 'smg', ammo: '9mm', magSize: 30, auto: true, modes: ['auto', 'semi'], interval: 0.0706,
            spread: 2.4, aimSpread: 1.1, moveSpread: 2.2, recoil: 1.1, recoilMax: 11, recoilRecover: 17,
-           reloadTac: 2.0, reloadEmpty: 2.6, swap: 0.6, noise: 18, twoHanded: true, aimSpeed: 0.55, len: 17 },
+           reloadTac: 2.0, reloadEmpty: 2.6, swap: 0.6, noise: 18, twoHanded: true, aimSpeed: 0.55, len: 17, weight: 0.96 },
   tr1:   { id: 'tr1', name: 'TR-1 5.56 Carabine', short: 'TR1', type: 'rifle', ammo: '5.56', magSize: 30, auto: true, modes: ['auto', 'semi'], interval: 0.0857,
            spread: 0.9, aimSpread: 0.25, moveSpread: 2.0, recoil: 1.6, recoilMax: 9, recoilRecover: 18,
-           reloadTac: 2.2, reloadEmpty: 2.9, swap: 0.8, noise: 28, twoHanded: true, aimSpeed: 0.5, len: 27 },
+           reloadTac: 2.2, reloadEmpty: 2.9, swap: 0.8, noise: 28, twoHanded: true, aimSpeed: 0.5, len: 27, weight: 0.9 },
   m4s:   { id: 'm4s', name: 'M-4 Tactique 12ga', short: 'M4', type: 'shotgun', ammo: '12ga', magSize: 7, auto: false, interval: 0.3,
            spread: 1.5, aimSpread: 0.8, moveSpread: 1.5, recoil: 6, recoilMax: 12, recoilRecover: 14,
-           reloadShell: 0.55, swap: 0.8, noise: 30, twoHanded: true, aimSpeed: 0.5, len: 27 }
+           reloadShell: 0.55, swap: 0.8, noise: 30, twoHanded: true, aimSpeed: 0.5, len: 27, weight: 0.9 }
 };
 
 // Crée une instance d'arme. opts : { mags: nb de chargeurs de réserve, rounds: cartouches dans le chargeur }

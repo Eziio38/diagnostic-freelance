@@ -41,3 +41,5 @@ kbd { display: inline-block; padding: 2px 7px; margin: 0 1px; border: 1px solid 
 .stats .row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 6px 0; font-size: 15px; }
 .stats .row b { color: #ffd27f; }
 @media (max-width: 640px) { .screen { padding: 22px 18px; } .controls-grid { grid-template-columns: 1fr; } .controls-grid > div:nth-child(odd) { white-space: normal; margin-top: 8px; } }
+
+.gp-focus { outline: 2px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(211,47,47,0.55); }

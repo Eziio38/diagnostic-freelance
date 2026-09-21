@@ -311,18 +311,29 @@ class Renderer {
     ctx.fillText(fmtTime(game.time) + '   ·   ' + game.stats.kills + ' éliminations   ·   ' + game.stats.headshots + ' têtes', w - 28, 34);
     // --- Messages
     ctx.textAlign = 'center';
-    let my = h - 120;
+    let my = h - 132;
     for (const m of game.messages) { font(14, 600); ctx.globalAlpha = clamp(m.t, 0, 1); ctx.fillStyle = '#000'; ctx.fillText(m.text, w / 2 + 1, my + 1); ctx.fillStyle = '#fff'; ctx.fillText(m.text, w / 2, my); my -= 20; }
     ctx.globalAlpha = 1;
+    // --- Rappel des commandes (début de niveau)
+    if (game.hintT > 0 && p.alive) {
+      const gpm = game.input.usingGamepad && game.input.gp.connected;
+      const hint = gpm ? 'R2 tirer · L2 viser · R1 mêlée / désarmer / projeter / exécuter · ✕ esquive · □ recharger · △ ramasser · L1 lancer · ↑ soins · ←→ armes · L3 courir · Options pause'
+                       : 'Clic tirer · Clic droit viser · F mêlée / désarmer / projeter / exécuter · Espace esquive · R recharger · E ramasser · G lancer · H soins · 1-4 armes · Maj courir · Échap pause';
+      font(12, 500); ctx.textAlign = 'center'; ctx.globalAlpha = clamp(game.hintT, 0, 1) * 0.85;
+      ctx.fillStyle = '#000'; ctx.fillText(hint, w / 2 + 1, h - 105); ctx.fillStyle = '#ddd'; ctx.fillText(hint, w / 2, h - 106);
+      ctx.globalAlpha = 1;
+    }
     // --- Invite d'interaction
     if (game.nearPickup && p.alive) {
       const s = this.toScreen(game.camera, game.nearPickup.x, game.nearPickup.y);
-      font(12, 600); ctx.fillStyle = 'rgba(0,0,0,0.6)'; const txt = '[E] ' + game.nearPickup.label(); const tw = ctx.measureText(txt).width;
+      font(12, 600); ctx.fillStyle = 'rgba(0,0,0,0.6)'; const txt = '[' + game.input.glyph('interact') + '] ' + game.nearPickup.label(); const tw = ctx.measureText(txt).width;
       ctx.fillRect(s.x - tw / 2 - 6, s.y - 34, tw + 12, 18); ctx.fillStyle = '#fff'; ctx.fillText(txt, s.x, s.y - 21);
     }
     // --- Réticule
     if (game.settings.crosshair && p.alive && game.state === 'playing') {
-      const mx = game.input.mouse.x, my2 = game.input.mouse.y;
+      const usingGp = game.input.usingGamepad && game.input.gp.connected;
+      const ap = usingGp ? this.toScreen(game.camera, game.aimPoint.x, game.aimPoint.y) : game.input.mouse;
+      const mx = ap.x, my2 = ap.y;
       const ps = this.toScreen(game.camera, p.x, p.y);
       const d = Math.max(30, dist(ps.x, ps.y, mx, my2));
       const gap = clamp(Math.tan(rad(p.spread)) * d + 4, 4, 80);

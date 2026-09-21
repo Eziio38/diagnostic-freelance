@@ -26,7 +26,9 @@ class Game {
     this.visPoly = null; this.nearPickup = null; this.deadT = 0;
     this.wave = 0; this.waveTimer = 0; this.waveQueue = []; this.waveSpawnT = 0;
     const diff = Store.get('difficulty', 'realiste');
-    this.settings = { difficulty: diff, crosshair: Store.get('crosshair', true), enemyBars: diff !== 'babayaga' };
+    this.settings = { difficulty: diff, crosshair: Store.get('crosshair', true), enemyBars: diff !== 'babayaga', aimAssist: Store.get('aimAssist', true) };
+    this.aimPoint = { x: 0, y: 0 }; this.hintT = 0;
+    this.input.onConnect = pad => { this.msg('Manette connectée : ' + (/dualsense|054c/i.test(pad.id) ? 'DualSense' : pad.id.slice(0, 24))); };
     Object.assign(this.settings, DIFFICULTIES[diff]);
     this.stats = new Stats();
     this.unlocked = Store.get('unlocked', 1);
@@ -56,6 +58,7 @@ class Game {
       else this.pickups.push(new Pickup(pk.kind, pk.x, pk.y));
     }
     this.camera.x = this.player.x; this.camera.y = this.player.y;
+    this.aimPoint.x = this.player.x + 3 * TILE; this.aimPoint.y = this.player.y;
     this.characters = [this.player].concat(this.enemies);
     this.state = 'briefing';
     this.ui.showBriefing(L);
@@ -65,6 +68,7 @@ class Game {
     this.state = 'playing'; this.last = performance.now();
     this.audio.startMusic(this.level.music);
     if (this.level.waves) { this.waveTimer = 6; this.msg('Première vague dans 6 secondes'); }
+    this.hintT = 12;
     this.ui.hideAll();
   }
   pause() { if (this.state !== 'playing') return; this.state = 'paused'; this.ui.show('pause'); if (this.audio.ctx) this.audio.ctx.suspend(); }
@@ -75,6 +79,10 @@ class Game {
   // ------------------------------------------------------------------------
   loop(ts) {
     const dt = Math.min(0.033, (ts - this.last) / 1000 || 0); this.last = ts;
+    this.input.poll();
+    const cursor = this.input.usingGamepad ? 'none' : 'crosshair';
+    if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
+    if (this.ui.anyVisible()) this.ui.gamepadNav();
     if (this.state === 'playing' || this.state === 'dead' || this.state === 'complete') this.update(dt);
     if (this.state !== 'menu') this.renderer.render(this);
     else this.ui.renderMenuBackdrop(this.renderer);
@@ -85,7 +93,7 @@ class Game {
     this.time += dt; this.stats.time = this.time;
     const p = this.player, input = this.input, world = this.world;
     if (this.state === 'playing') {
-      if (input.pressed('pause')) { this.pause(); return; }
+      if (input.pressed('pause')) { this.pause(); input.consumeGamepad(); return; }
       p.update(dt, this, input);
     } else { p.baseUpdate(dt); }
     this.characters = [p].concat(this.enemies.filter(e => !e.dead));
@@ -114,6 +122,7 @@ class Game {
     this.dmgIndicators = this.dmgIndicators.filter(d => d.t > 0);
     this.noises = this.noises.filter(n => this.time - n.t < 0.5);
     if (this.hurtVignette > 0) this.hurtVignette -= dt * 1.5;
+    if (this.hintT > 0) this.hintT -= dt;
     this.shakeAmt *= Math.pow(0.02, dt);
     // Caméra
     const m = this.mouseWorld();
@@ -207,7 +216,7 @@ class Game {
   // ------------------------------------------------------------------------
   // Événements de jeu
   // ------------------------------------------------------------------------
-  mouseWorld() { const r = this.renderer; return { x: (this.input.mouse.x - r.w / 2) / r.zoom + this.camera.x, y: (this.input.mouse.y - r.h / 2) / r.zoom + this.camera.y }; }
+  mouseWorld() { if (this.input.usingGamepad && this.input.gp.connected) return { x: this.aimPoint.x, y: this.aimPoint.y }; const r = this.renderer; return { x: (this.input.mouse.x - r.w / 2) / r.zoom + this.camera.x, y: (this.input.mouse.y - r.h / 2) / r.zoom + this.camera.y }; }
   panOf(x) { return clamp((x - this.player.x) / (12 * TILE), -1, 1); }
   volOf(x, y) { const d = dist(x, y, this.player.x, this.player.y); return Math.pow(clamp(1 - d / (32 * TILE), 0.03, 1), 1.4); }
   shake(n) { this.shakeAmt = Math.max(this.shakeAmt, n); }
@@ -223,7 +232,7 @@ class Game {
     // Douille éjectée vers la droite du tireur
     const ea = shooter.angle + HALF_PI + rand(-0.4, 0.4); const sp = rand(90, 160);
     this.shells.push({ x: mz.x - Math.cos(shooter.angle) * (w.def.len - 2), y: mz.y - Math.sin(shooter.angle) * (w.def.len - 2), vx: Math.cos(ea) * sp, vy: Math.sin(ea) * sp, rot: rand(0, TAU), vr: rand(-20, 20), life: rand(0.35, 0.5), cls: ammo.cls });
-    if (shooter.isPlayer) this.shake(ammo.cls === 'shotgun' ? 5 : ammo.cls === 'rifle' ? 2.2 : 1.8);
+    if (shooter.isPlayer) { this.shake(ammo.cls === 'shotgun' ? 5 : ammo.cls === 'rifle' ? 2.2 : 1.8); this.input.rumble(ammo.cls === 'shotgun' ? 1 : ammo.cls === 'rifle' ? 0.5 : 0.7, ammo.cls === 'shotgun' ? 0.8 : 0.35, ammo.cls === 'shotgun' ? 150 : ammo.cls === 'rifle' ? 60 : 90); }
     // Fumée légère
     for (let i = 0; i < 3; i++) this.particles.push({ x: mz.x, y: mz.y, vx: Math.cos(shooter.angle + gauss() * 0.4) * rand(40, 120), vy: Math.sin(shooter.angle + gauss() * 0.4) * rand(40, 120), life: rand(0.15, 0.35), maxLife: 0.35, color: 'rgba(200,200,200,0.35)', size: rand(1.5, 3), kind: 'smoke' });
   }
@@ -246,7 +255,7 @@ class Game {
   }
   onPlayerHurt(dmg, shooter) {
     this.stats.damageTaken += dmg;
-    this.hurtVignette = 1; this.shake(4); this.audio.hurt();
+    this.hurtVignette = 1; this.shake(4); this.audio.hurt(); this.input.rumble(0.9, 0.5, 220);
     if (shooter) this.dmgIndicators.push({ angle: angleTo(this.player.x, this.player.y, shooter.x, shooter.y), t: 1 });
     if (this.player.healing > 0) { this.player.healing = 0; this.msg('Soins interrompus'); }
   }
@@ -287,7 +296,7 @@ class Game {
   interact() {
     const pk = this.nearPickup, p = this.player; if (!pk) return;
     if (pk.kind === 'weapon') { if (p.addWeapon(pk.weapon, this)) pk.dead = true; }
-    else if (pk.kind === 'health') { p.medkits++; pk.dead = true; this.msg('Kit de soins (+1) — touche H'); this.audio.pickup(); }
+    else if (pk.kind === 'health') { p.medkits++; pk.dead = true; this.msg('Kit de soins (+1) — ' + (this.input.usingGamepad ? 'D-pad haut' : 'touche H')); this.audio.pickup(); }
     else if (pk.kind === 'plate') { p.armor.hp = Math.min(p.armor.max, p.armor.hp + 90); pk.dead = true; this.msg('Plaque balistique insérée'); this.audio.pickup(); }
     else if (pk.kind === 'ammo') {
       const w = p.weapons.find(x => x.id === pk.ammoFor) || p.weapons.find(x => x.def.type !== 'melee');
@@ -314,6 +323,37 @@ class UI {
       if (e.code === 'Enter' && game.state === 'dead' && this.visible('dead')) this.action('retry');
       if (e.code === 'Enter' && game.state === 'complete') this.action('next');
     });
+  }
+  anyVisible() { return !document.getElementById('ui').classList.contains('hidden'); }
+  currentScreen() { for (const k in this.screens) if (!this.screens[k].classList.contains('hidden')) return this.screens[k]; return null; }
+  gamepadNav() {
+    const g = this.game, inp = g.input, gp = inp.gp; if (!gp.connected) return;
+    const screen = this.currentScreen(); if (!screen) return;
+    const items = Array.from(screen.querySelectorAll('button:not(.locked), select, input')).filter(el => el.offsetParent !== null);
+    if (!items.length) return;
+    if (this.navScreen !== screen) { this.navScreen = screen; this.focusIdx = 0; this.navT = 0; }
+    const now = performance.now();
+    let dir = 0;
+    if (gp.just[GP.UP] || gp.just[GP.LEFT]) dir = -1;
+    if (gp.just[GP.DOWN] || gp.just[GP.RIGHT]) dir = 1;
+    if (Math.abs(gp.ly) > 0.6 && now - this.navT > 230) { dir = gp.ly > 0 ? 1 : -1; this.navT = now; }
+    if (dir) { this.focusIdx = (this.focusIdx + dir + items.length) % items.length; inp.usingGamepad = true; }
+    if (this.focusIdx >= items.length) this.focusIdx = 0;
+    items.forEach((el, i) => el.classList.toggle('gp-focus', i === this.focusIdx));
+    const el = items[this.focusIdx];
+    if (dir && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+    let acted = false;
+    if (gp.just[GP.CROSS]) {
+      acted = true;
+      if (el.tagName === 'SELECT') { el.selectedIndex = (el.selectedIndex + 1) % el.options.length; el.dispatchEvent(new Event('change')); }
+      else if (el.type === 'checkbox') { el.checked = !el.checked; el.dispatchEvent(new Event('change')); }
+      else if (el.type === 'range') { const v = parseFloat(el.value) + 0.1; el.value = (v > 1 ? 0 : v).toFixed(2); el.dispatchEvent(new Event('input')); }
+      else el.click();
+    } else if (gp.just[GP.CIRCLE]) {
+      acted = true;
+      const back = screen.querySelector('[data-action="back"], [data-action="resume"], [data-action="menu"]'); if (back) back.click();
+    } else if (gp.just[GP.OPTIONS] && g.state === 'paused') { acted = true; g.resume(); }
+    if (acted) inp.consumeGamepad();
   }
   show(id) { this.hideAll(); this.screens[id].classList.remove('hidden'); document.getElementById('ui').classList.remove('hidden'); }
   hideAll() { for (const k in this.screens) this.screens[k].classList.add('hidden'); document.getElementById('ui').classList.add('hidden'); }
@@ -357,6 +397,7 @@ class UI {
     const vol = document.getElementById('volume'); vol.value = g.audio.volume; vol.addEventListener('input', () => g.audio.setVolume(parseFloat(vol.value)));
     const mus = document.getElementById('music'); mus.checked = g.audio.musicOn; mus.addEventListener('change', () => g.audio.toggleMusic(mus.checked));
     const ch = document.getElementById('crosshair'); ch.checked = g.settings.crosshair; ch.addEventListener('change', () => { g.settings.crosshair = ch.checked; Store.set('crosshair', ch.checked); });
+    const aa = document.getElementById('aimassist'); aa.checked = g.settings.aimAssist; aa.addEventListener('change', () => { g.settings.aimAssist = aa.checked; Store.set('aimAssist', aa.checked); });
     const reset = document.getElementById('reset-progress'); reset.addEventListener('click', () => { Store.set('unlocked', 1); g.unlocked = 1; LEVELS.forEach(L => Store.set('best_' + L.id, null)); this.buildLevels(); reset.textContent = 'Progression effacée'; });
   }
   showBriefing(L) {
