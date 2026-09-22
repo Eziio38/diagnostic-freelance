@@ -20,14 +20,15 @@ const BINDS = {
   pause: ['Escape', 'KeyP'],
   slot1: ['Digit1'], slot2: ['Digit2'], slot3: ['Digit3'], slot4: ['Digit4'],
   next: ['Tab'],
-  prev: []
+  prev: [],
+  view: ['KeyV']
 };
 // Boutons du mapping standard (numérotation W3C) — noms DualSense
 const GP = { CROSS: 0, CIRCLE: 1, SQUARE: 2, TRIANGLE: 3, L1: 4, R1: 5, L2: 6, R2: 7, CREATE: 8, OPTIONS: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15, PS: 16, TOUCHPAD: 17 };
 const GP_BINDS = {
   sprint: [GP.L3], reload: [GP.SQUARE], melee: [GP.R1], interact: [GP.TRIANGLE], dodge: [GP.CROSS],
   heal: [GP.UP], throw: [GP.L1], mode: [GP.DOWN], pause: [GP.OPTIONS], next: [GP.RIGHT], prev: [GP.LEFT],
-  forward: [], back: [], left: [], right: [], slot1: [], slot2: [], slot3: [], slot4: []
+  forward: [], back: [], left: [], right: [], slot1: [], slot2: [], slot3: [], slot4: [], view: [GP.TOUCHPAD]
 };
 const GP_GLYPH = { CROSS: '✕', CIRCLE: '○', SQUARE: '□', TRIANGLE: '△', L1: 'L1', R1: 'R1', L2: 'L2', R2: 'R2', OPTIONS: 'Options', L3: 'L3', R3: 'R3', UP: '↑', DOWN: '↓', LEFT: '←', RIGHT: '→' };
 
@@ -36,7 +37,8 @@ class Input {
     this.canvas = canvas;
     this.keys = Object.create(null);
     this.just = Object.create(null);
-    this.mouse = { x: 0, y: 0, down: false, rdown: false, justDown: false, justRDown: false, wheel: 0 };
+    this.mouse = { x: 0, y: 0, down: false, rdown: false, justDown: false, justRDown: false, wheel: 0, dx: 0, dy: 0 };
+    this.locked = false; this.onLockChange = null;
     this.gp = { connected: false, index: -1, id: '', standard: true, lx: 0, ly: 0, lmag: 0, rx: 0, ry: 0, rmag: 0, buttons: new Array(18).fill(false), just: new Array(18).fill(false), values: new Array(18).fill(0) };
     this.pad = null;
     this.usingGamepad = false;
@@ -50,9 +52,20 @@ class Input {
     window.addEventListener('keyup', e => { this.keys[e.code] = false; });
     window.addEventListener('blur', () => { this.keys = Object.create(null); this.mouse.down = false; this.mouse.rdown = false; });
     window.addEventListener('mousemove', e => {
+      if (this.locked) {
+        // Curseur verrouillé (vue 3D) : on n'a que le mouvement relatif
+        this.mouse.dx += e.movementX || 0; this.mouse.dy += e.movementY || 0;
+        if (Math.abs(e.movementX) + Math.abs(e.movementY) > 1) this.usingGamepad = false;
+        return;
+      }
       if (Math.abs(e.clientX - this.mouse.x) + Math.abs(e.clientY - this.mouse.y) > 3) this.usingGamepad = false;
       this.mouse.x = e.clientX; this.mouse.y = e.clientY;
     });
+    document.addEventListener('pointerlockchange', () => {
+      this.locked = document.pointerLockElement === canvas;
+      if (this.onLockChange) this.onLockChange(this.locked);
+    });
+    document.addEventListener('pointerlockerror', () => { this.locked = false; });
     window.addEventListener('mousedown', e => {
       if (e.target !== canvas) return;
       this.usingGamepad = false;
@@ -98,6 +111,8 @@ class Input {
     }
     if (activity) this.usingGamepad = true;
   }
+  requestLock() { if (this.locked) return; try { const r = this.canvas.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => { try { this.canvas.requestPointerLock(); } catch (e) { /* */ } }); } catch (e) { try { this.canvas.requestPointerLock(); } catch (e2) { /* */ } } }
+  releaseLock() { if (this.locked && document.exitPointerLock) document.exitPointerLock(); }
   consumeGamepad() { for (let i = 0; i < 18; i++) this.gp.just[i] = false; }
   down(action) {
     const b = BINDS[action]; for (let i = 0; i < b.length; i++) if (this.keys[b[i]]) return true;
@@ -127,5 +142,5 @@ class Input {
     const k = BINDS[action][0] || '';
     return k.replace('Key', '').replace('Digit', '').replace('ShiftLeft', 'Maj').replace('Space', 'Espace').replace('Escape', 'Échap');
   }
-  endFrame() { this.just = Object.create(null); this.mouse.justDown = false; this.mouse.justRDown = false; this.mouse.wheel = 0; }
+  endFrame() { this.just = Object.create(null); this.mouse.justDown = false; this.mouse.justRDown = false; this.mouse.wheel = 0; this.mouse.dx = 0; this.mouse.dy = 0; }
 }

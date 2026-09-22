@@ -1,6 +1,6 @@
 # EXCOMMUNICADO — gun-fu tactique en local
 
-Jeu d'action vue du dessus, **100 % local** (HTML5 / Canvas / Web Audio, aucune dépendance, aucun asset externe), inspiré de l'univers de John Wick : combat rapproché mêlant judo et tir au pistolet, munitions comptées, létalité réaliste, protections balistiques, ennemis qui se mettent à couvert.
+Jeu d'action **vue du dessus ou 3D à la première personne**, **100 % local** (HTML5 / Canvas / Web Audio, aucune dépendance, aucun asset externe), inspiré de l'univers de John Wick : combat rapproché mêlant judo et tir au pistolet, munitions comptées, létalité réaliste, protections balistiques, ennemis qui se mettent à couvert.
 
 ## Lancer le jeu
 
@@ -12,6 +12,16 @@ Jeu d'action vue du dessus, **100 % local** (HTML5 / Canvas / Web Audio, aucune 
    ```
 
 Le son est synthétisé en temps réel (Web Audio) et démarre au premier clic.
+
+## Vue 3D à la première personne
+
+Options → Vue → « Première personne (3D) », ou `V` en jeu (pavé tactile sur la manette). Le rendu est un raycaster maison sans dépendance : murs, portes, piliers texturés, caisses et voitures à mi-hauteur (on tire par-dessus), vitres translucides qui éclatent, sol et plafond projetés avec le sang au sol, éclairage coloré par sources avec ombres portées par les murs, sprites des ennemis (debout, à terre, morts), ramassages, balles et flashs.
+
+- Un clic dans la fenêtre capture la souris (regard libre) ; `Échap` la libère et met en pause. Sensibilité réglable.
+- Déplacement relatif au regard (avancer / reculer, pas chassés). Clic droit ou `L2` pour épauler (champ de vision resserré).
+- **La visée verticale compte** : viser au-dessus des épaules touche la tête, le buste touche le torse, plus bas les jambes ; trop haut, la balle passe au-dessus.
+- Modèle d'arme en vue subjective avec recul, rechargement, culasse ouverte, mêlée et couteau ; minimap en haut à droite.
+- Résolution du rendu réglable (480 à 960 colonnes) selon la machine.
 
 ## Manette PS5 (DualSense)
 
@@ -87,7 +97,8 @@ excommunicado/
     ├── maps.js       niveaux en ASCII
     ├── world.js      grille, collisions, rayons, A*, portes, vitres, décals
     ├── entities.js   joueur, ennemis (IA), balles, ramassages, dégâts
-    ├── render.js     rendu, éclairage, brouillard de vision, HUD
+    ├── render.js     rendu 2D, éclairage, brouillard de vision, HUD
+    ├── fps.js        rendu 3D première personne (raycasting, lightmap, sprites, arme)
     └── game.js       boucle, niveaux, vagues, effets, interface
 ```
 

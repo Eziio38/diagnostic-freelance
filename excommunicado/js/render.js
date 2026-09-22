@@ -236,9 +236,10 @@ class Renderer {
     const vg = ctx.createRadialGradient(w / 2, h / 2, h * 0.45, w / 2, h / 2, h * 0.95);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
     // Indicateurs de direction des dégâts
+    const fp = game.fpMode;
     for (const d of game.dmgIndicators) {
-      const s = this.toScreen(game.camera, p.x, p.y);
-      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(d.angle); ctx.globalAlpha = d.t;
+      const s = fp ? { x: w / 2, y: h / 2 } : this.toScreen(game.camera, p.x, p.y);
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(fp ? d.angle - p.angle : d.angle); ctx.globalAlpha = d.t;
       ctx.strokeStyle = '#ff3b3b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 58, -0.35, 0.35); ctx.stroke();
       ctx.restore();
     }
@@ -325,18 +326,18 @@ class Renderer {
     }
     // --- Invite d'interaction
     if (game.nearPickup && p.alive) {
-      const s = this.toScreen(game.camera, game.nearPickup.x, game.nearPickup.y);
+      const s = fp ? { x: w / 2, y: h * 0.66 } : this.toScreen(game.camera, game.nearPickup.x, game.nearPickup.y);
       font(12, 600); ctx.fillStyle = 'rgba(0,0,0,0.6)'; const txt = '[' + game.input.glyph('interact') + '] ' + game.nearPickup.label(); const tw = ctx.measureText(txt).width;
       ctx.fillRect(s.x - tw / 2 - 6, s.y - 34, tw + 12, 18); ctx.fillStyle = '#fff'; ctx.fillText(txt, s.x, s.y - 21);
     }
     // --- Réticule
     if (game.settings.crosshair && p.alive && game.state === 'playing') {
       const usingGp = game.input.usingGamepad && game.input.gp.connected;
-      const ap = usingGp ? this.toScreen(game.camera, game.aimPoint.x, game.aimPoint.y) : game.input.mouse;
+      const ap = fp ? { x: w / 2, y: h / 2 } : usingGp ? this.toScreen(game.camera, game.aimPoint.x, game.aimPoint.y) : game.input.mouse;
       const mx = ap.x, my2 = ap.y;
       const ps = this.toScreen(game.camera, p.x, p.y);
-      const d = Math.max(30, dist(ps.x, ps.y, mx, my2));
-      const gap = clamp(Math.tan(rad(p.spread)) * d + 4, 4, 80);
+      const d = fp ? game.fp.focalScreen : Math.max(30, dist(ps.x, ps.y, mx, my2));
+      const gap = clamp(Math.tan(rad(p.spread)) * d + 4, 4, 120);
       ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5;
       if (wpn && wpn.def.type === 'melee') { ctx.beginPath(); ctx.arc(mx, my2, 5, 0, TAU); ctx.stroke(); }
       else {

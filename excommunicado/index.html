@@ -14,7 +14,7 @@
   <!-- Menu principal -->
   <section id="menu" class="screen">
     <h1>EXCOMMUNICADO</h1>
-    <p class="tag">Gun-fu tactique · un jeu en local inspiré de John Wick</p>
+    <p class="tag">Gun-fu tactique · un jeu en local inspiré de John Wick · vue du dessus ou 3D à la première personne</p>
     <div class="buttons">
       <button data-action="start" class="primary">Nouvelle partie</button>
       <button data-action="levels">Choisir un niveau</button>
@@ -50,6 +50,15 @@
       <div><kbd>1</kbd>–<kbd>4</kbd> / <kbd>Molette</kbd> / <kbd>Tab</kbd></div><div>Changer d'arme (plus rapide que recharger)</div>
       <div><kbd>Échap</kbd> / <kbd>P</kbd></div><div>Pause</div>
     </div>
+    <h3>Vue 3D à la première personne</h3>
+    <p class="desc">Activez-la dans les options ou avec <kbd>V</kbd> en jeu. Un clic dans la fenêtre capture la souris (regard libre) ; <kbd>Échap</kbd> la libère et met le jeu en pause. À la manette, le stick droit pilote le regard.</p>
+    <div class="controls-grid">
+      <div><kbd>Souris</kbd> / <kbd>Stick droit</kbd></div><div>Regarder (lacet et tangage)</div>
+      <div><kbd>Z</kbd><kbd>S</kbd> / <kbd>Q</kbd><kbd>D</kbd></div><div>Avancer / reculer, pas chassés gauche / droite (relatifs au regard)</div>
+      <div><kbd>Visée verticale</kbd></div><div>La hauteur visée décide de la zone touchée : tête (au-dessus des épaules), torse, jambes. Trop haut = la balle passe au-dessus.</div>
+      <div><kbd>Clic droit</kbd> / <kbd>L2</kbd></div><div>Épauler : champ de vision resserré, dispersion réduite, marche lente</div>
+      <div><kbd>Minimap</kbd></div><div>En haut à droite : plan des environs, cône de vision, ennemis en vue</div>
+    </div>
     <h3>Manette PS5 (DualSense) — et autres manettes standard</h3>
     <p class="desc">Branchez la manette (USB ou Bluetooth) et appuyez sur un bouton : elle est détectée automatiquement, les menus se pilotent au D-pad / stick, <kbd>✕</kbd> valide, <kbd>○</kbd> revient. Vibrations à chaque tir, impact et projection.</p>
     <div class="controls-grid">
@@ -82,6 +91,10 @@
   <section id="options" class="screen hidden">
     <h2>Options</h2>
     <div class="options">
+      <label>Vue <select id="view"><option value="top">Vue du dessus (2D)</option><option value="fp">Première personne (3D)</option></select></label>
+      <p class="desc">En jeu : <kbd>V</kbd> (ou le pavé tactile de la manette) bascule entre les deux vues à tout moment.</p>
+      <label>Sensibilité souris (3D) <input type="range" id="sensitivity" min="0.3" max="3" step="0.1"></label>
+      <label>Résolution du rendu 3D <select id="fpres"><option value="480">Basse (480 colonnes)</option><option value="640">Moyenne (640)</option><option value="800">Haute (800)</option><option value="960">Très haute (960)</option></select></label>
       <label>Difficulté <select id="difficulty"></select></label>
       <p id="difficulty-desc" class="desc"></p>
       <label>Volume <input type="range" id="volume" min="0" max="1" step="0.05"></label>
@@ -137,6 +150,7 @@
 <script src="js/world.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/render.js"></script>
+<script src="js/fps.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

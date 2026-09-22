@@ -59,7 +59,7 @@ function applyHit(game, target, dmgTable, zone, opts) {
     if (target.helmet && target.helmet.hp > 0 && (opts.pen || 0) < 1 && opts.cls !== 'melee') {
       dmg = 22 * scale; target.helmet.hp = 0; helmetSaved = true;
       target.stagger = Math.max(target.stagger, 0.7);
-      game.audio.helmet(game.panOf(target.x), game.volOf(target.x, target.y));
+      game.audio.helmet(game.panOf(target.x, target.y), game.volOf(target.x, target.y));
       game.spark(target.x, target.y, 6);
       if (opts.shooter && opts.shooter.isPlayer) game.msg('Casque brisé !');
     } else {
@@ -85,12 +85,20 @@ function applyHit(game, target, dmgTable, zone, opts) {
   target.lastHitBy = opts.shooter || null; target.lastHitT = game.time; target.hurtFlash = 0.18;
   if (dmg > 0 && !helmetSaved) {
     game.blood(target.x, target.y, opts.dir != null ? opts.dir : rand(0, TAU), zone === 'head' ? 2 : 1);
-    if (!target.isPlayer) game.audio.fleshHit(game.panOf(target.x), game.volOf(target.x, target.y));
+    if (!target.isPlayer) game.audio.fleshHit(game.panOf(target.x, target.y), game.volOf(target.x, target.y));
   }
   if (target.isPlayer) { game.onPlayerHurt(dmg, opts.shooter); }
   if (target.hp <= 0) { game.kill(target, opts.shooter, zone, opts.cls); }
   else if (dmg >= 25 && !target.isPlayer) target.stagger = Math.max(target.stagger, 0.22);
   return dmg;
+}
+// Zone touchée en vue subjective : hauteur du point d'impact (m) + écart latéral
+function hitZone3D(hz, d, r, downed) {
+  if (downed) { if (hz < 0.02 || hz > 0.45 || d > r) return null; return d < r * 0.45 ? 'torso' : 'limb'; }
+  if (hz < 0.02 || hz > 1.85 || d > r) return null;   // passe au-dessus / à côté
+  if (hz > 1.55) return d < r * 0.5 ? 'head' : null;   // la tête est plus étroite que les épaules
+  if (hz > 0.95) return 'torso';
+  return 'limb';
 }
 // Zone touchée selon la distance perpendiculaire de la trajectoire au centre
 function hitZone(d, r, isPlayerTarget) {
@@ -111,6 +119,7 @@ class Bullet {
     this.ammo = ammo; this.owner = owner; this.team = owner.team;
     this.scale = opts.scale || 1; this.pen = ammo.pen; this.travel = 0; this.dead = false;
     this.hit = new Set(); this.life = 0;
+    this.pitch = opts.pitch != null ? opts.pitch : null; this.z0 = 1.62;
   }
   update(dt, game) {
     const world = game.world;
@@ -125,19 +134,29 @@ class Bullet {
       const rc = world.raycast(x0, y0, x1, y1, (tx, ty) => world.isBulletRelevant(tx, ty));
       const tEnd = rc.hit ? rc.t : 1;
       // personnages
-      let best = null, bestT = 2;
+      let best = null, bestT = 2, bestZone = null;
       const chars = game.characters;
       for (let i = 0; i < chars.length; i++) {
         const c = chars[i];
         if (c === this.owner || c.dead || this.hit.has(c)) continue;
         const rr = c.downed > 0 ? c.r * 0.8 : c.r;
         const t = segCircle(x0, y0, x1, y1, c.x, c.y, rr);
-        if (t >= 0 && t <= tEnd && t < bestT) { bestT = t; best = c; }
+        if (t < 0 || t > tEnd || t >= bestT) continue;
+        const d = lineDistToPoint(x0, y0, x1, y1, c.x, c.y);
+        let zone;
+        if (this.pitch != null) {
+          // Vue subjective : la hauteur visée décide de la zone (tête / torse / jambes) ou d'un tir qui passe au-dessus
+          const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
+          const distAt = (this.travel - segLen) + Math.hypot(hx - this.px, hy - this.py);
+          const hz = this.z0 + Math.tan(this.pitch) * distAt / TILE;
+          zone = hitZone3D(hz, d, c.r, c.downed > 0);
+          if (!zone) { this.hit.add(c); continue; }
+        } else zone = c.downed > 0 ? (d < c.r * 0.45 ? 'torso' : 'limb') : hitZone(d, c.r, c.isPlayer);
+        bestT = t; best = c; bestZone = zone;
       }
       if (best) {
         const hx = x0 + (x1 - x0) * bestT, hy = y0 + (y1 - y0) * bestT;
-        const d = lineDistToPoint(x0, y0, x1, y1, best.x, best.y);
-        const zone = best.downed > 0 ? (d < best.r * 0.45 ? 'torso' : 'limb') : hitZone(d, best.r, best.isPlayer);
+        const zone = bestZone;
         this.hit.add(best);
         game.stats.hitsOn(this.owner, best);
         applyHit(game, best, this.ammo.dmg, zone, { cls: this.ammo.cls, pen: this.pen, scale: this.scale, shooter: this.owner, dir: this.angle });
@@ -146,7 +165,7 @@ class Bullet {
       }
       if (rc.hit) {
         const t = world.get(rc.tx, rc.ty);
-        const pan = game.panOf(rc.x), vol = game.volOf(rc.x, rc.y);
+        const pan = game.panOf(rc.x, rc.y), vol = game.volOf(rc.x, rc.y);
         if (t === T.WALL || t === T.PILLAR || t === T.CAR) {
           game.impact(rc.x, rc.y, this.angle, t === T.CAR);
           if (Math.random() < 0.25) game.audio.ricochet(pan, vol); else game.audio.impact(pan, vol);
@@ -205,7 +224,7 @@ class Thrown {
         const dmgT = isKnife ? { head: 90, torso: 60, limb: 30 } : { head: 30, torso: 14, limb: 8 };
         applyHit(game, c, dmgT, isKnife ? 'torso' : 'head', { cls: isKnife ? 'melee' : 'melee', scale: 1, shooter: this.owner, dir: Math.atan2(this.vy, this.vx) });
         if (!c.dead) { c.stagger = Math.max(c.stagger, isKnife ? 0.8 : 1.3); if (c.brain) c.brain.windup = 0; }
-        game.audio.meleeHit(game.panOf(c.x), true);
+        game.audio.meleeHit(game.panOf(c.x, c.y), true);
         this.x = c.x - Math.sign(this.vx) * 10; this.y = c.y - Math.sign(this.vy) * 10;
         this.land(game); return;
       }
@@ -251,7 +270,7 @@ class Player extends Character {
     this.armor = { hp: 160, max: 160, reduce: { pistol: 0.7, rifle: 0.4, shotgun: 0.55, melee: 0.35 } };
     this.current = 0; this.swapT = 0; this.wantFire = false; this.fireHeld = false; this.mouseAngle = 0;
     this.footT = 0; this.lastShotT = -9;
-    this.velX = 0; this.velY = 0; this.stickAngle = null;
+    this.velX = 0; this.velY = 0; this.stickAngle = null; this.pitch = 0;
   }
   setWeapons(list) { this.weapons = list; this.current = Math.min(1, list.length - 1); this.weapon = list[this.current]; }
   selectWeapon(i, game) {
@@ -288,8 +307,28 @@ class Player extends Character {
     let mag = (mx || my) ? 1 : 0;
     if (!mag && input.gp.connected && input.gp.lmag > 0) { mx = input.gp.lx; my = input.gp.ly; mag = input.gp.lmag; }
     const len = Math.hypot(mx, my); if (len > 0) { mx /= len; my /= len; }
-    // --- Visée : souris (instantanée) ou stick droit (rotation du corps limitée, aide à la visée)
-    if (gpMode) {
+    // --- Visée : vue subjective (souris verrouillée ou stick droit), sinon souris (instantanée) ou stick droit
+    const lockGate = game.fpMode && !gpMode && !input.locked;
+    if (lockGate && input.mouse.justDown) { input.requestLock(); }
+    if (lockGate && game.state === 'playing') game.msg('Cliquez pour capturer la souris');
+    if (game.fpMode) {
+      const sens = 0.0022 * (game.settings.sensitivity || 1) * (this.aiming ? 0.6 : 1);
+      if (this.executing <= 0) {
+        if (gpMode) {
+          const curve = v => Math.sign(v) * Math.pow(Math.abs(v), 1.7);
+          this.angle += curve(input.gp.rx) * 3.6 * (this.aiming ? 0.5 : 1) * dt;
+          this.pitch -= curve(input.gp.ry) * 2.4 * (this.aiming ? 0.5 : 1) * dt;
+          if (game.settings.aimAssist && input.gp.rmag < 0.85) { const a2 = this.aimAssist(game, this.angle); this.angle += angleDiff(this.angle, a2) * Math.min(1, dt * 7); }
+        } else if (input.locked) { this.angle += input.mouse.dx * sens; this.pitch -= input.mouse.dy * sens; }
+      }
+      this.pitch = clamp(this.pitch, -0.85, 0.85);
+      if (this.angle > Math.PI) this.angle -= TAU; else if (this.angle < -Math.PI) this.angle += TAU;
+      this.mouseAngle = this.angle;
+      game.aimPoint.x = this.x + Math.cos(this.angle) * 5 * TILE; game.aimPoint.y = this.y + Math.sin(this.angle) * 5 * TILE;
+      // Déplacement relatif au regard : avant / arrière et pas chassés
+      const f = -my, sd = mx, ca = Math.cos(this.angle), sa = Math.sin(this.angle);
+      mx = ca * f - sa * sd; my = sa * f + ca * sd;
+    } else if (gpMode) {
       if (input.gp.rmag > 0.05) this.stickAngle = Math.atan2(input.gp.ry, input.gp.rx);
       else if (this.stickAngle == null) this.stickAngle = this.angle;
       let target = this.stickAngle;
@@ -343,7 +382,7 @@ class Player extends Character {
       const tx = mx * speed, ty = my * speed;
       const accel = (mag > 0 ? 1100 : 1800) * dt;
       const ddx = tx - this.velX, ddy = ty - this.velY; const dl = Math.hypot(ddx, ddy);
-      if (dl <= accel) { this.velX = tx; this.velY = ty; } else { this.velX += ddx / dl * accel; this.velY += ddy / dl * accel; }
+      if (dl <= accel || dl < 1e-6) { this.velX = tx; this.velY = ty; } else { this.velX += ddx / dl * accel; this.velY += ddy / dl * accel; }
       dx = this.velX * dt; dy = this.velY * dt;
       const sp = Math.hypot(this.velX, this.velY);
       this.moving = sp > 4 ? clamp(sp / this.speed, 0.3, 1.6) : 0;
@@ -372,10 +411,11 @@ class Player extends Character {
     // Tir
     const canShoot = w && w.def.type !== 'melee' && this.swapT <= 0 && this.dodgeT <= 0 && this.meleeT <= 0 && this.healing <= 0 && this.stagger <= 0;
     const auto = w && w.def.auto && w.mode !== 'semi';
-    const trigger = auto ? input.fireDown() : input.fireJust();
-    if (w && w.def.type === 'melee') { if (input.fireJust()) this.melee(game); }
+    const fireJust = input.fireJust() && !lockGate, fireDown = input.fireDown() && !lockGate;
+    const trigger = auto ? fireDown : fireJust;
+    if (w && w.def.type === 'melee') { if (fireJust) this.melee(game); }
     else if (trigger && canShoot) this.tryFire(game);
-    this.fireHeld = input.fireDown();
+    this.fireHeld = fireDown;
   }
   // Aide à la visée (manette) : légère attraction vers l'ennemi visible le plus proche de l'axe
   aimAssist(game, angle) {
@@ -412,7 +452,7 @@ class Player extends Character {
     for (let i = 0; i < n; i++) {
       let a = this.angle + gauss() * spread;
       if (ammo.pellets) a += gauss() * rad(ammo.pelletSpread);
-      game.bullets.push(new Bullet(mz.x, mz.y, a, ammo, this));
+      game.bullets.push(new Bullet(mz.x, mz.y, a, ammo, this, game.fpMode ? { pitch: this.pitch + gauss() * spread * 0.7 } : {}));
     }
     game.stats.shots++;
     game.shoot(this, mz, ammo);
@@ -469,7 +509,7 @@ class Player extends Character {
       game.stats.meleeHits++; game.input.rumble(0.4, 0.2, 60);
       applyHit(game, target, w.def.dmg, 'torso', { cls: 'melee', shooter: this, dir });
       if (!target.dead) target.stagger = Math.max(target.stagger, 0.35);
-      game.audio.meleeHit(game.panOf(target.x), false);
+      game.audio.meleeHit(game.panOf(target.x, target.y), false);
       return;
     }
     game.stats.meleeHits++; game.input.rumble(0.45, 0.25, 70);
@@ -477,11 +517,11 @@ class Player extends Character {
     if (this.combo === 1) {
       applyHit(game, target, { head: 12, torso: 10, limb: 6 }, 'torso', { cls: 'melee', shooter: this, dir });
       if (!target.dead) target.stagger = Math.max(target.stagger, 0.5);
-      game.audio.meleeHit(game.panOf(target.x), false);
+      game.audio.meleeHit(game.panOf(target.x, target.y), false);
     } else if (this.combo === 2) {
       applyHit(game, target, { head: 12, torso: 10, limb: 6 }, 'torso', { cls: 'melee', shooter: this, dir });
       if (!target.dead) target.stagger = Math.max(target.stagger, 0.55);
-      game.audio.meleeHit(game.panOf(target.x), false);
+      game.audio.meleeHit(game.panOf(target.x, target.y), false);
       if (target.hasFirearm) this.disarm(target, game);
     } else {
       // Projection (judo)
@@ -491,7 +531,7 @@ class Player extends Character {
         const nx = target.x + Math.cos(dir) * 26, ny = target.y + Math.sin(dir) * 26;
         if (!game.world.raycast(target.x, target.y, nx, ny, (tx, ty) => game.world.isSolid(tx, ty)).hit) { target.x = nx; target.y = ny; }
         target.angle = dir + HALF_PI;
-        game.msg('Projection !'); game.audio.bodyFall(game.panOf(target.x)); game.shake(4); game.input.rumble(0.7, 0.3, 120);
+        game.msg('Projection !'); game.audio.bodyFall(game.panOf(target.x, target.y)); game.shake(4); game.input.rumble(0.7, 0.3, 120);
         game.stats.throws++;
       }
       this.combo = 0;
@@ -506,7 +546,7 @@ class Player extends Character {
     if (firearms < 3) { this.weapons.push(w); game.msg('Désarmé ! Vous récupérez : ' + w.def.name); }
     else { game.pickups.push(new Pickup('weapon', this.x + Math.cos(this.angle) * 14, this.y + Math.sin(this.angle) * 14, { weapon: w })); game.msg('Désarmé ! Arme au sol'); }
     game.stats.disarms++;
-    game.audio.click(0, game.panOf(target.x), 0.3, 1200);
+    game.audio.click(0, game.panOf(target.x, target.y), 0.3, 1200);
   }
   startExecution(target, game) {
     this.executing = 0.55; this.execTarget = target; this.combo = 0;
@@ -526,7 +566,7 @@ class Player extends Character {
       t.hp = 0; game.blood(t.x, t.y, this.angle, 2); game.kill(t, this, 'head', 'execution');
     } else {
       const knife = this.weapons.find(x => x.def.type === 'melee');
-      game.audio.meleeHit(game.panOf(t.x), true);
+      game.audio.meleeHit(game.panOf(t.x, t.y), true);
       t.hp = 0; game.blood(t.x, t.y, this.angle, knife ? 2 : 1); game.kill(t, this, knife ? 'head' : 'torso', 'execution');
     }
   }
@@ -632,7 +672,7 @@ class Enemy extends Character {
   }
   shout(game) {
     const b = this.brain; if (b.alertShout) return; b.alertShout = true;
-    game.audio.shout(game.panOf(this.x), game.volOf(this.x, this.y));
+    game.audio.shout(game.panOf(this.x, this.y), game.volOf(this.x, this.y));
     for (const e of game.enemies) {
       if (e === this || e.dead) continue;
       if (dist(this.x, this.y, e.x, e.y) < 11 * TILE) {
@@ -684,7 +724,7 @@ class Enemy extends Character {
     }
     world.moveCircle(this, dx, dy);
     this.moving = 1; this.stepDist += Math.hypot(dx, dy);
-    if (this.stepDist > 28) { this.stepDist = 0; game.audio.footstep(0.05 * game.volOf(this.x, this.y), game.panOf(this.x)); }
+    if (this.stepDist > 28) { this.stepDist = 0; game.audio.footstep(0.05 * game.volOf(this.x, this.y), game.panOf(this.x, this.y)); }
     return false;
   }
   faceTarget(dt, x, y, rate = 12) { const a = angleTo(this.x, this.y, x, y); this.angle += angleDiff(this.angle, a) * Math.min(1, dt * rate); }
@@ -871,7 +911,7 @@ class Enemy extends Character {
       if (b.retrieve && !b.retrieve.dead) {
         const arrived = this.moveTo(dt, game, b.retrieve.x, b.retrieve.y, 1.1, 12);
         if (this.moving) this.angle = angleTo(this.x, this.y, b.retrieve.x, b.retrieve.y);
-        if (arrived) { const w = b.retrieve.weapon; b.retrieve.dead = true; this.weapons.push(w); this.weapon = w; b.retrieve = null; b.mode = 'engage'; b.reactT = 0.3; game.audio.click(0, game.panOf(this.x), 0.2, 1200); }
+        if (arrived) { const w = b.retrieve.weapon; b.retrieve.dead = true; this.weapons.push(w); this.weapon = w; b.retrieve = null; b.mode = 'engage'; b.reactT = 0.3; game.audio.click(0, game.panOf(this.x, this.y), 0.2, 1200); }
         return;
       }
     }
@@ -889,7 +929,7 @@ class Enemy extends Character {
           applyHit(game, p, dmg, Math.random() < 0.8 ? 'torso' : 'limb', { cls: 'melee', shooter: this, dir: angleTo(this.x, this.y, p.x, p.y) });
           game.audio.meleeHit(0, knife); game.shake(knife ? 5 : 3);
           if (!knife) p.stagger = Math.max(p.stagger, 0.25);
-        } else game.audio.swish(game.panOf(this.x));
+        } else game.audio.swish(game.panOf(this.x, this.y));
       }
       return;
     }

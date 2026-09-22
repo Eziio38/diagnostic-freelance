@@ -26,7 +26,9 @@ class Game {
     this.visPoly = null; this.nearPickup = null; this.deadT = 0;
     this.wave = 0; this.waveTimer = 0; this.waveQueue = []; this.waveSpawnT = 0;
     const diff = Store.get('difficulty', 'realiste');
-    this.settings = { difficulty: diff, crosshair: Store.get('crosshair', true), enemyBars: diff !== 'babayaga', aimAssist: Store.get('aimAssist', true) };
+    this.settings = { difficulty: diff, crosshair: Store.get('crosshair', true), enemyBars: diff !== 'babayaga', aimAssist: Store.get('aimAssist', true), view: Store.get('view', 'top'), sensitivity: Store.get('sensitivity', 1) };
+    this.fp = new FPRenderer(this.renderer); this.ignoreUnlock = false;
+    this.input.onLockChange = locked => { if (!locked && this.state === 'playing' && this.fpMode && !this.ignoreUnlock) this.pause(); this.ignoreUnlock = false; };
     this.aimPoint = { x: 0, y: 0 }; this.hintT = 0;
     this.input.onConnect = pad => { this.msg('Manette connectée : ' + (/dualsense|054c/i.test(pad.id) ? 'DualSense' : pad.id.slice(0, 24))); };
     Object.assign(this.settings, DIFFICULTIES[diff]);
@@ -34,6 +36,26 @@ class Game {
     this.unlocked = Store.get('unlocked', 1);
     this.ui = new UI(this);
     requestAnimationFrame(t => this.loop(t));
+  }
+  get fpMode() { return this.settings.view === 'fp'; }
+  setView(v) {
+    if (v !== 'fp' && v !== 'top') return;
+    const was = this.settings.view; this.settings.view = v; Store.set('view', v);
+    if (was === v) return;
+    if (v === 'fp') { if (this.state === 'playing' && !this.input.usingGamepad) this.input.requestLock(); }
+    else if (this.input.locked) { this.ignoreUnlock = true; this.input.releaseLock(); }
+    if (this.player) this.player.pitch = 0;
+    if (this.state === 'playing') this.msg(v === 'fp' ? 'Vue à la première personne' : 'Vue du dessus');
+  }
+  toggleView() { this.setView(this.fpMode ? 'top' : 'fp'); }
+  faceOpenDirection() {
+    const p = this.player, w = this.world; let best = 0, bestD = -1;
+    for (let i = 0; i < 16; i++) {
+      const a = i / 16 * TAU;
+      const rc = w.raycast(p.x, p.y, p.x + Math.cos(a) * 20 * TILE, p.y + Math.sin(a) * 20 * TILE, (tx, ty) => w.isOpaque(tx, ty));
+      const d = dist(p.x, p.y, rc.x, rc.y); if (d > bestD) { bestD = d; best = a; }
+    }
+    p.angle = best; p.stickAngle = best; p.mouseAngle = best; p.pitch = 0;
   }
   setDifficulty(id) {
     this.settings.difficulty = id; Object.assign(this.settings, DIFFICULTIES[id]); this.settings.enemyBars = id !== 'babayaga'; Store.set('difficulty', id);
@@ -59,6 +81,7 @@ class Game {
     }
     this.camera.x = this.player.x; this.camera.y = this.player.y;
     this.aimPoint.x = this.player.x + 3 * TILE; this.aimPoint.y = this.player.y;
+    this.fp.setWorld(this.world); this.faceOpenDirection();
     this.characters = [this.player].concat(this.enemies);
     this.state = 'briefing';
     this.ui.showBriefing(L);
@@ -70,21 +93,22 @@ class Game {
     if (this.level.waves) { this.waveTimer = 6; this.msg('Première vague dans 6 secondes'); }
     this.hintT = 12;
     this.ui.hideAll();
+    if (this.fpMode && !this.input.usingGamepad) this.input.requestLock();
   }
-  pause() { if (this.state !== 'playing') return; this.state = 'paused'; this.ui.show('pause'); if (this.audio.ctx) this.audio.ctx.suspend(); }
-  resume() { if (this.state !== 'paused') return; this.state = 'playing'; this.ui.hideAll(); this.last = performance.now(); if (this.audio.ctx) this.audio.ctx.resume(); this.input.endFrame(); }
-  toMenu() { this.state = 'menu'; this.audio.stopMusic(); if (this.audio.ctx) this.audio.ctx.resume(); this.ui.show('menu'); }
+  pause() { if (this.state !== 'playing') return; this.state = 'paused'; this.ui.show('pause'); if (this.audio.ctx) this.audio.ctx.suspend(); if (this.input.locked) { this.ignoreUnlock = true; this.input.releaseLock(); } }
+  resume() { if (this.state !== 'paused') return; this.state = 'playing'; this.ui.hideAll(); this.last = performance.now(); if (this.audio.ctx) this.audio.ctx.resume(); this.input.endFrame(); if (this.fpMode && !this.input.usingGamepad) this.input.requestLock(); }
+  toMenu() { if (this.input.locked) { this.ignoreUnlock = true; this.input.releaseLock(); } this.state = 'menu'; this.audio.stopMusic(); if (this.audio.ctx) this.audio.ctx.resume(); this.ui.show('menu'); }
   // ------------------------------------------------------------------------
   // Boucle
   // ------------------------------------------------------------------------
   loop(ts) {
-    const dt = Math.min(0.033, (ts - this.last) / 1000 || 0); this.last = ts;
+    const dt = clamp((ts - this.last) / 1000 || 0, 0, 0.033); this.last = ts;
     this.input.poll();
     const cursor = this.input.usingGamepad ? 'none' : 'crosshair';
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
     if (this.ui.anyVisible()) this.ui.gamepadNav();
     if (this.state === 'playing' || this.state === 'dead' || this.state === 'complete') this.update(dt);
-    if (this.state !== 'menu') this.renderer.render(this);
+    if (this.state !== 'menu') { if (this.fpMode && this.world) this.fp.render(this); else this.renderer.render(this); }
     else this.ui.renderMenuBackdrop(this.renderer);
     this.input.endFrame();
     requestAnimationFrame(t => this.loop(t));
@@ -94,6 +118,7 @@ class Game {
     const p = this.player, input = this.input, world = this.world;
     if (this.state === 'playing') {
       if (input.pressed('pause')) { this.pause(); input.consumeGamepad(); return; }
+      if (input.pressed('view')) this.toggleView();
       p.update(dt, this, input);
     } else { p.baseUpdate(dt); }
     this.characters = [p].concat(this.enemies.filter(e => !e.dead));
@@ -112,7 +137,7 @@ class Game {
     // Effets
     for (const pt of this.particles) { pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vx *= 0.9; pt.vy *= 0.9; pt.life -= dt; }
     this.particles = this.particles.filter(pt => pt.life > 0);
-    for (const s of this.shells) { s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.92; s.vy *= 0.92; s.rot += s.vr * dt; s.life -= dt; if (s.life <= 0) { world.addShell(s.x, s.y, s.rot, s.cls); this.audio.shellDrop(this.panOf(s.x)); } }
+    for (const s of this.shells) { s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.92; s.vy *= 0.92; s.rot += s.vr * dt; s.life -= dt; if (s.life <= 0) { world.addShell(s.x, s.y, s.rot, s.cls); this.audio.shellDrop(this.panOf(s.x, s.y)); } }
     this.shells = this.shells.filter(s => s.life > 0);
     for (const f of this.flashes) f.t -= dt;
     this.flashes = this.flashes.filter(f => f.t > 0);
@@ -134,7 +159,7 @@ class Game {
     if (this.shakeAmt > 0.2) { this.camera.x += gauss() * this.shakeAmt; this.camera.y += gauss() * this.shakeAmt; }
     // Visibilité
     const range = (this.level.viewRange || 13) * TILE;
-    this.visPoly = world.visibility(p.x, p.y, range);
+    this.visPoly = this.fpMode ? null : world.visibility(p.x, p.y, range);
     for (const e of this.enemies) {
       if (e.dead) { e.visible = true; continue; }
       const d = dist(p.x, p.y, e.x, e.y);
@@ -216,8 +241,11 @@ class Game {
   // ------------------------------------------------------------------------
   // Événements de jeu
   // ------------------------------------------------------------------------
-  mouseWorld() { if (this.input.usingGamepad && this.input.gp.connected) return { x: this.aimPoint.x, y: this.aimPoint.y }; const r = this.renderer; return { x: (this.input.mouse.x - r.w / 2) / r.zoom + this.camera.x, y: (this.input.mouse.y - r.h / 2) / r.zoom + this.camera.y }; }
-  panOf(x) { return clamp((x - this.player.x) / (12 * TILE), -1, 1); }
+  mouseWorld() { if (this.fpMode || (this.input.usingGamepad && this.input.gp.connected)) return { x: this.aimPoint.x, y: this.aimPoint.y }; const r = this.renderer; return { x: (this.input.mouse.x - r.w / 2) / r.zoom + this.camera.x, y: (this.input.mouse.y - r.h / 2) / r.zoom + this.camera.y }; }
+  panOf(x, y) {
+    if (this.fpMode && y != null) return clamp(Math.sin(angleDiff(this.player.angle, angleTo(this.player.x, this.player.y, x, y))) * 0.85, -1, 1);
+    return clamp((x - this.player.x) / (12 * TILE), -1, 1);
+  }
   volOf(x, y) { const d = dist(x, y, this.player.x, this.player.y); return Math.pow(clamp(1 - d / (32 * TILE), 0.03, 1), 1.4); }
   shake(n) { this.shakeAmt = Math.max(this.shakeAmt, n); }
   msg(text) { if (this.messages.length && this.messages[this.messages.length - 1].text === text) { this.messages[this.messages.length - 1].t = 2.2; return; } this.messages.push({ text, t: 2.2 }); if (this.messages.length > 4) this.messages.shift(); }
@@ -225,9 +253,9 @@ class Game {
   shoot(shooter, mz, ammo) {
     const w = shooter.weapon;
     const vol = shooter.isPlayer ? 1 : this.volOf(mz.x, mz.y);
-    this.audio.gunshot(ammo.cls, shooter.isPlayer ? 0 : this.panOf(mz.x), vol);
+    this.audio.gunshot(ammo.cls, shooter.isPlayer ? 0 : this.panOf(mz.x, mz.y), vol);
     const visible = shooter.isPlayer || this.world.los(this.player.x, this.player.y, mz.x, mz.y);
-    this.flashes.push({ x: mz.x, y: mz.y, angle: shooter.angle, t: 0.05, max: 0.05, size: ammo.cls === 'shotgun' ? 16 : ammo.cls === 'rifle' ? 13 : 10, visible });
+    this.flashes.push({ x: mz.x, y: mz.y, angle: shooter.angle, owner: shooter, t: 0.05, max: 0.05, size: ammo.cls === 'shotgun' ? 16 : ammo.cls === 'rifle' ? 13 : 10, visible });
     this.noise(mz.x, mz.y, w.def.noise * TILE, shooter);
     // Douille éjectée vers la droite du tireur
     const ea = shooter.angle + HALF_PI + rand(-0.4, 0.4); const sp = rand(90, 160);
@@ -263,7 +291,7 @@ class Game {
     if (target.dead) return;
     target.dead = true; target.hp = 0; target.downed = 0; target.stagger = 0;
     this.world.addPool(target.x, target.y, 14);
-    this.audio.bodyFall(this.panOf(target.x));
+    this.audio.bodyFall(this.panOf(target.x, target.y));
     if (target.isPlayer) {
       this.state = 'dead'; this.deadT = 0; this.audio.stopMusic();
       return;
@@ -397,6 +425,9 @@ class UI {
     const vol = document.getElementById('volume'); vol.value = g.audio.volume; vol.addEventListener('input', () => g.audio.setVolume(parseFloat(vol.value)));
     const mus = document.getElementById('music'); mus.checked = g.audio.musicOn; mus.addEventListener('change', () => g.audio.toggleMusic(mus.checked));
     const ch = document.getElementById('crosshair'); ch.checked = g.settings.crosshair; ch.addEventListener('change', () => { g.settings.crosshair = ch.checked; Store.set('crosshair', ch.checked); });
+    const view = document.getElementById('view'); view.value = g.settings.view; view.addEventListener('change', () => g.setView(view.value));
+    const sens = document.getElementById('sensitivity'); sens.value = g.settings.sensitivity; sens.addEventListener('input', () => { g.settings.sensitivity = parseFloat(sens.value); Store.set('sensitivity', g.settings.sensitivity); });
+    const res = document.getElementById('fpres'); res.value = String(g.fp.quality); res.addEventListener('change', () => g.fp.setQuality(parseInt(res.value, 10)));
     const aa = document.getElementById('aimassist'); aa.checked = g.settings.aimAssist; aa.addEventListener('change', () => { g.settings.aimAssist = aa.checked; Store.set('aimAssist', aa.checked); });
     const reset = document.getElementById('reset-progress'); reset.addEventListener('click', () => { Store.set('unlocked', 1); g.unlocked = 1; LEVELS.forEach(L => Store.set('best_' + L.id, null)); this.buildLevels(); reset.textContent = 'Progression effacée'; });
   }
