@@ -154,7 +154,7 @@ class Renderer {
       ctx.restore(); return;
     }
     const w = c.weapon; const two = w && w.def.twoHanded; const gunLen = w && w.def.type !== 'melee' ? w.def.len : 0;
-    const punch = c.meleeAnim > 0 ? Math.sin((c.meleeAnim / 0.22) * Math.PI) : 0;
+    const punch = c.meleeAnim > 0 ? Math.sin((c.meleeAnim / (c.meleeAnimDur || 0.22)) * Math.PI) : 0;
     ctx.strokeStyle = body; ctx.lineWidth = 5; ctx.lineCap = 'round';
     if (w && w.def.type !== 'melee' && (!c.isPlayer || c.executing <= 0 || true)) {
       const kick = w.recoil * 0.35;

@@ -25,7 +25,8 @@ class Character {
     this.downed = 0; this.stagger = 0; this.slowT = 0; this.hurtFlash = 0;
     this.weapon = null; this.weapons = []; this.armor = null; this.helmet = null;
     this.vx = 0; this.vy = 0; this.moving = 0; this.stepDist = 0;
-    this.meleeAnim = 0; this.lastHitBy = null; this.lastHitT = -99; this.isPlayer = false;
+    this.meleeAnim = 0; this.meleeAnimDur = 0.22; this.meleeKind = 'strike'; this.lastHitBy = null; this.lastHitT = -99; this.isPlayer = false;
+    this.walkPhase = 0; this.fireAnim = 0; this.thrownT = 0; this.throwAnim = 0;
     this.name = '?';
   }
   get alive() { return !this.dead; }
@@ -43,6 +44,10 @@ class Character {
     if (this.slowT > 0) this.slowT -= dt;
     if (this.hurtFlash > 0) this.hurtFlash -= dt;
     if (this.meleeAnim > 0) this.meleeAnim -= dt;
+    if (this.fireAnim > 0) this.fireAnim -= dt;
+    if (this.thrownT > 0) this.thrownT -= dt;
+    if (this.throwAnim > 0) this.throwAnim -= dt;
+    this.walkPhase += dt * 7.5 * (this.moving || 0);
     if (this.dead) this.deadT += dt;
   }
 }
@@ -60,7 +65,7 @@ function applyHit(game, target, dmgTable, zone, opts) {
       dmg = 22 * scale; target.helmet.hp = 0; helmetSaved = true;
       target.stagger = Math.max(target.stagger, 0.7);
       game.audio.helmet(game.panOf(target.x, target.y), game.volOf(target.x, target.y));
-      game.spark(target.x, target.y, 6);
+      game.spark(target.x, target.y, 6); game.spawnFx('helmet', target.x, target.y, { dir: opts.dir });
       if (opts.shooter && opts.shooter.isPlayer) game.msg('Casque brisé !');
     } else {
       dmg = dmgTable.head * scale;
@@ -347,6 +352,7 @@ class Player extends Character {
     if (this.executing > 0) {
       this.executing -= dt;
       if (this.execTarget && !this.execTarget.dead) this.angle = angleTo(this.x, this.y, this.execTarget.x, this.execTarget.y);
+      if (game.fpMode) this.pitch += (-0.62 - this.pitch) * Math.min(1, dt * 9);
       if (this.executing <= 0) this.finishExecution(game);
       this.moving = 0; this.velX = this.velY = 0; this.vx = this.vy = 0; return;
     }
@@ -476,7 +482,7 @@ class Player extends Character {
     let best = this.current, bestR = -1;
     for (let i = 0; i < this.weapons.length; i++) { const r = weaponRounds(this.weapons[i]); if (r > bestR) { bestR = r; best = i; } }
     this.current = best; this.weapon = this.weapons[best]; this.swapT = 0.25;
-    game.audio.throwWhoosh(); game.msg('Arme lancée');
+    game.audio.throwWhoosh(); game.msg('Arme lancée'); this.throwAnim = 0.32;
   }
   // Mêlée façon gun-fu : frappe → désarmement → projection → exécution
   melee(game) {
@@ -492,7 +498,8 @@ class Player extends Character {
       if (ad > rad(75)) continue;
       if (d < bestD) { bestD = d; target = e; }
     }
-    this.meleeT = isKnife ? w.def.rate : 0.4; this.meleeAnim = 0.22;
+    this.meleeT = isKnife ? w.def.rate : 0.4;
+    this.setMeleeAnim(isKnife ? 'knife' : 'miss');
     if (this.weapon) weaponCancelReload(this.weapon);
     this.healing = 0;
     if (!target) { game.audio.swish(); return; }
@@ -515,19 +522,22 @@ class Player extends Character {
     game.stats.meleeHits++; game.input.rumble(0.45, 0.25, 70);
     this.combo = (game.time - this.comboT < 1.4) ? this.combo + 1 : 1; this.comboT = game.time;
     if (this.combo === 1) {
+      this.setMeleeAnim('strike');
       applyHit(game, target, { head: 12, torso: 10, limb: 6 }, 'torso', { cls: 'melee', shooter: this, dir });
       if (!target.dead) target.stagger = Math.max(target.stagger, 0.5);
       game.audio.meleeHit(game.panOf(target.x, target.y), false);
     } else if (this.combo === 2) {
+      this.setMeleeAnim(target.hasFirearm ? 'disarm' : 'strike');
       applyHit(game, target, { head: 12, torso: 10, limb: 6 }, 'torso', { cls: 'melee', shooter: this, dir });
       if (!target.dead) target.stagger = Math.max(target.stagger, 0.55);
       game.audio.meleeHit(game.panOf(target.x, target.y), false);
       if (target.hasFirearm) this.disarm(target, game);
     } else {
       // Projection (judo)
+      this.setMeleeAnim('throw');
       applyHit(game, target, { head: 18, torso: 16, limb: 10 }, 'torso', { cls: 'melee', shooter: this, dir });
       if (!target.dead) {
-        target.downed = 2.6; target.stagger = 0;
+        target.downed = 2.6; target.stagger = 0; target.thrownT = 0.5;
         const nx = target.x + Math.cos(dir) * 26, ny = target.y + Math.sin(dir) * 26;
         if (!game.world.raycast(target.x, target.y, nx, ny, (tx, ty) => game.world.isSolid(tx, ty)).hit) { target.x = nx; target.y = ny; }
         target.angle = dir + HALF_PI;
@@ -537,8 +547,13 @@ class Player extends Character {
       this.combo = 0;
     }
   }
+  setMeleeAnim(kind) {
+    const dur = { miss: 0.26, strike: 0.3, disarm: 0.45, throw: 0.6, knife: 0.3, execute: 0.55 }[kind] || 0.25;
+    this.meleeKind = kind; this.meleeAnimDur = dur; this.meleeAnim = dur;
+  }
   disarm(target, game) {
     const w = target.weapon; if (!w || w.def.type === 'melee') return;
+    game.spawnFx('gun', target.x, target.y, { dir: angleTo(this.x, this.y, target.x, target.y) + HALF_PI * choice([-1, 1]) });
     target.weapons = target.weapons.filter(x => x !== w);
     target.weapon = target.weapons[0] || null;
     if (target.brain) { target.brain.mode = 'melee'; target.brain.burstLeft = 0; }
@@ -549,7 +564,7 @@ class Player extends Character {
     game.audio.click(0, game.panOf(target.x, target.y), 0.3, 1200);
   }
   startExecution(target, game) {
-    this.executing = 0.55; this.execTarget = target; this.combo = 0;
+    this.executing = 0.55; this.execTarget = target; this.combo = 0; this.setMeleeAnim('execute');
     if (target.brain) target.brain.executed = true;
     target.downed = Math.max(target.downed, 1.0);
     game.msg('Exécution');

@@ -20,7 +20,8 @@ Options → Vue → « Première personne (3D) », ou `V` en jeu (pavé tactile 
 - Un clic dans la fenêtre capture la souris (regard libre) ; `Échap` la libère et met en pause. Sensibilité réglable.
 - Déplacement relatif au regard (avancer / reculer, pas chassés). Clic droit ou `L2` pour épauler (champ de vision resserré).
 - **La visée verticale compte** : viser au-dessus des épaules touche la tête, le buste touche le torse, plus bas les jambes ; trop haut, la balle passe au-dessus.
-- Modèle d'arme en vue subjective avec recul, rechargement, culasse ouverte, mêlée et couteau ; minimap en haut à droite.
+- Modèle d'arme en vue subjective animé : culasse qui recule à chaque tir, douilles éjectées, fumée, rechargement en phases (chargeur qui tombe, main qui en insère un neuf, culasse relâchée à vide, levier d'armement sur la carabine, cartouches insérées une à une au fusil), enchaînement gun-fu (frappe de paume, saisie et désarmement, projection avec roulis de caméra), coups de couteau avec traînée, exécution avec caméra qui plonge, esquive avec inclinaison, mains et bandage pendant les soins ; minimap en haut à droite.
+- Ennemis animés par un rig procédural vu de face, de dos et de profil : cycle de marche et de course, garde, tir, rechargement, recul sous l'impact, étourdissement, garde et frappe au corps à corps, projection en vol, chute en trois temps, relevé ; casques brisés et armes arrachées qui volent.
 - Résolution du rendu réglable (480 à 960 colonnes) selon la machine.
 
 ## Manette PS5 (DualSense)

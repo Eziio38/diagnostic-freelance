@@ -20,7 +20,7 @@ class Game {
     this.audio = new AudioSys();
     this.renderer = new Renderer(this.canvas);
     this.state = 'menu'; this.levelIndex = 0; this.level = null; this.world = null; this.player = null;
-    this.enemies = []; this.bullets = []; this.pickups = []; this.particles = []; this.shells = []; this.flashes = []; this.thrown = []; this.noises = []; this.messages = []; this.dmgIndicators = [];
+    this.enemies = []; this.bullets = []; this.pickups = []; this.particles = []; this.shells = []; this.flashes = []; this.thrown = []; this.noises = []; this.messages = []; this.dmgIndicators = []; this.fxSprites = [];
     this.characters = [];
     this.camera = { x: 0, y: 0 }; this.shakeAmt = 0; this.hurtVignette = 0; this.time = 0; this.last = 0;
     this.visPoly = null; this.nearPickup = null; this.deadT = 0;
@@ -66,7 +66,7 @@ class Game {
   loadLevel(i) {
     this.levelIndex = i; const L = LEVELS[i]; this.level = L;
     this.world = new World(L);
-    this.enemies = []; this.bullets = []; this.pickups = []; this.particles = []; this.shells = []; this.flashes = []; this.thrown = []; this.noises = []; this.messages = []; this.dmgIndicators = [];
+    this.enemies = []; this.bullets = []; this.pickups = []; this.particles = []; this.shells = []; this.flashes = []; this.thrown = []; this.noises = []; this.messages = []; this.dmgIndicators = []; this.fxSprites = [];
     this.time = 0; this.stats = new Stats(); this.deadT = 0; this.hurtVignette = 0; this.shakeAmt = 0;
     this.wave = 0; this.waveTimer = 0; this.waveQueue = []; this.exitReached = false; this.cleared = false;
     const sp = this.world.spawns;
@@ -141,6 +141,14 @@ class Game {
     this.shells = this.shells.filter(s => s.life > 0);
     for (const f of this.flashes) f.t -= dt;
     this.flashes = this.flashes.filter(f => f.t > 0);
+    // Débris 3D (casques, armes arrachées) : balistique simple avec rebond
+    for (const fx of this.fxSprites) {
+      fx.life -= dt; fx.vz -= 9.8 * dt; fx.z += fx.vz * dt;
+      const nx = fx.x + fx.vx * dt, ny = fx.y + fx.vy * dt;
+      if (!world.raycast(fx.x, fx.y, nx, ny, (tx, ty) => world.isSolid(tx, ty)).hit) { fx.x = nx; fx.y = ny; } else { fx.vx *= -0.3; fx.vy *= -0.3; }
+      if (fx.z < 0) { fx.z = 0; fx.vz = -fx.vz * 0.35; fx.vx *= 0.5; fx.vy *= 0.5; if (Math.abs(fx.vz) < 0.4) fx.vz = 0; }
+    }
+    this.fxSprites = this.fxSprites.filter(fx => fx.life > 0);
     for (const m of this.messages) m.t -= dt;
     this.messages = this.messages.filter(m => m.t > 0);
     for (const d of this.dmgIndicators) d.t -= dt * 0.8;
@@ -248,6 +256,10 @@ class Game {
   }
   volOf(x, y) { const d = dist(x, y, this.player.x, this.player.y); return Math.pow(clamp(1 - d / (32 * TILE), 0.03, 1), 1.4); }
   shake(n) { this.shakeAmt = Math.max(this.shakeAmt, n); }
+  spawnFx(kind, x, y, opts = {}) {
+    const dir = opts.dir != null ? opts.dir : rand(0, TAU); const sp = kind === 'helmet' ? rand(60, 120) : rand(90, 160);
+    this.fxSprites.push({ kind, x, y, z: kind === 'helmet' ? 1.7 : 1.2, vx: Math.cos(dir) * sp, vy: Math.sin(dir) * sp, vz: kind === 'helmet' ? rand(2.5, 4) : rand(1.5, 3), life: 1.6, rot: 0 });
+  }
   msg(text) { if (this.messages.length && this.messages[this.messages.length - 1].text === text) { this.messages[this.messages.length - 1].t = 2.2; return; } this.messages.push({ text, t: 2.2 }); if (this.messages.length > 4) this.messages.shift(); }
   noise(x, y, r, source) { this.noises.push({ x, y, r, t: this.time, source }); }
   shoot(shooter, mz, ammo) {
@@ -257,6 +269,7 @@ class Game {
     const visible = shooter.isPlayer || this.world.los(this.player.x, this.player.y, mz.x, mz.y);
     this.flashes.push({ x: mz.x, y: mz.y, angle: shooter.angle, owner: shooter, t: 0.05, max: 0.05, size: ammo.cls === 'shotgun' ? 16 : ammo.cls === 'rifle' ? 13 : 10, visible });
     this.noise(mz.x, mz.y, w.def.noise * TILE, shooter);
+    shooter.fireAnim = 0.14;
     // Douille éjectée vers la droite du tireur
     const ea = shooter.angle + HALF_PI + rand(-0.4, 0.4); const sp = rand(90, 160);
     this.shells.push({ x: mz.x - Math.cos(shooter.angle) * (w.def.len - 2), y: mz.y - Math.sin(shooter.angle) * (w.def.len - 2), vx: Math.cos(ea) * sp, vy: Math.sin(ea) * sp, rot: rand(0, TAU), vr: rand(-20, 20), life: rand(0.35, 0.5), cls: ammo.cls });
@@ -268,7 +281,7 @@ class Game {
     this.world.addBlood(x, y, dir, amount);
     for (let i = 0; i < 6 + amount * 6; i++) {
       const a = dir + gauss() * 0.7; const sp = rand(60, 220) * (0.6 + amount * 0.4);
-      this.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.2, 0.5), maxLife: 0.5, color: 'rgba(150,10,20,0.9)', size: rand(1, 2.5), kind: 'blood' });
+      this.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.2, 0.5), maxLife: 0.5, color: 'rgba(150,10,20,0.9)', size: rand(1, 2.5), kind: 'blood', vz: rand(-0.5, 2.2), z0: rand(0.9, 1.5) });
     }
   }
   spark(x, y, n) {
